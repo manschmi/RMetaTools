@@ -1,0 +1,214 @@
+---
+title: "Metagene Analysis with RMetaTools"
+author: "Manfred Schmid"
+date: "`r Sys.Date()`"
+output: 
+      rmarkdown::html_vignette:
+        fig_caption: yes
+vignette: >
+  %\VignetteIndexEntry{Metagene Analysis with RMetaTools}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Load Package
+
+```{r}
+library('RMetaTools')
+```
+
+
+## Loading Regions
+
+Using a bed file this will create a range around an anchor point *TSS*, *TES* or *center*. Note, under the hood this uses rtracklayer to load, so gtfs etc should work, but non-conventional columns in your files may cause this to fail.
+
+```{r}
+bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
+
+anchor = 'TSS'
+upstream = 1000
+downstream = 1000
+window_size = 50
+```
+
+```{r}
+regions <- meta_regions(bedfile, 'TSS', upstream, downstream, window_size)
+
+regions
+```
+
+
+## Create a metagene matrix
+
+```{r}
+bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
+
+mat <- get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size)
+
+head(mat)
+```
+
+
+this matrix can be directly plotted either as heatmap or colMeans, etc...
+```{r}
+heatmap(as.matrix(mat), Rowv = NA, Colv = NA, labRow = NA, labCol = NA)
+```
+
+
+```{r}
+plot(colSums(mat), type='l')
+```
+
+
+
+## tidy metagene analysis
+
+I prefer to use tidyverse logic for further analysis even though that me get problematic for big datasets.
+
+Convert the matrix to fully annotated tidy tbl can be done with the built-in function.
+```{r}
+(tidy_meta <- mat_to_tbl(mat, regions, anchor, upstream, downstream, window_size))
+```
+
+There is also a built-in heatmap plotter for the tidy data
+```{r}
+plot_htmp(tidy_meta)
+```
+
+
+May be useful to represent as log2 values
+```{r}
+log2_tidy_meta <- mutate(tidy_meta, value=log2(value+1))
+
+plot_htmp(log2_tidy_meta) +
+  scale_fill_gradient(low='white', high='navyblue') + #custom color scheme
+  coord_fixed(ratio = 4) #y/x aspect ratio of output plot
+```
+
+
+
+
+## metagene profiles
+
+So far this is simply doing a one-sample t.test which computes mean and parametric confidence intervals.
+```{r}
+log2_tidy_meta_avg <- meta_average(log2_tidy_meta)
+```
+
+This can be plotted easily
+```{r}
+plot_profile(log2_tidy_meta_avg)
+```
+
+
+
+## Recipe: order heatmap rows using sum of values per row
+
+To order heatmap rows in ggplot2 requires a bit of work.
+ie to order according to the sum in each row, we first compute and order '*by-hand*'.
+```{r}
+value_order <- log2_tidy_meta %>%
+  group_by(gene) %>%
+  summarize(total_value = sum(value)) %>%
+  arrange(total_value) %$%
+  gene
+```
+
+We can apply this ordering to the tbl using *factor()*.
+```{r}
+log2_tidy_meta %>%
+  mutate(gene = factor(gene, levels=value_order)) %>%
+  plot_htmp(., do_interpolate = TRUE) +
+  scale_fill_gradient(low='white', high='navyblue')
+```
+  
+  
+## Recipe: add another matrix side-by-side
+
+First create the new matrix.
+```{r}
+bw_plus2 <- system.file("extdata", "GSM1573839_mNET_8WG16_siCPSF73_plus_hg38.bw", package = "RMetaTools")
+bw_minus2 <- system.file("extdata", "GSM1573839_mNET_8WG16_siCPSF73_minus_hg38.bw", package = "RMetaTools")
+
+mat2 <- get_matrix(bw_plus2, bw_minus2, regions, upstream, downstream, window_size)
+
+tidy_meta2 <- mat_to_tbl(mat2, regions, anchor, upstream, downstream, window_size)
+```
+
+
+Before we combine, better add some identifier column, ie 'condition'.
+```{r}
+tidy_meta$condition <- 'ctrl'
+tidy_meta2$condition <- 'siCPSF73'
+```
+
+simply bind_rows then
+```{r}
+both_meta <- bind_rows(tidy_meta, tidy_meta2)
+log2_both_meta <- mutate(both_meta, value=log2(value+1))
+```
+
+
+#### heatmap side-by-side
+```{r}
+plot_htmp(log2_both_meta) +
+  scale_fill_gradient(low='white', high='navyblue') +
+  facet_grid(.~condition)
+```
+
+
+#### profiles of combine dataset
+
+average of a combined dataset, should work
+```{r}
+log2_both_meta_avg <- meta_average(log2_both_meta)
+```
+
+can be visualized as side-by-side plot:
+```{r}
+plot_profile(log2_both_meta_avg) +
+  facet_grid(.~condition)
+```
+
+
+but probably often more informative using overlay:
+```{r}
+plot_profile(log2_both_meta_avg, color_by='condition')
+```
+
+
+
+#### Recipe: log2 ratio between conditions
+
+using the tidy tbl this is pretty straightforward:
+```{r}
+(LFCs <- log2_both_meta %>%
+  spread(condition, value) %>%
+  mutate(value = siCPSF73-ctrl) %>%
+  dplyr::select(-siCPSF73, -ctrl))
+```
+
+```{r}
+plot_htmp(LFCs, color_by='value') +
+  scale_fill_gradient2(low='firebrick4', mid='white', high='navyblue', name="log2(siCPSF73/ctrl)") +
+  coord_fixed(ratio = 4) 
+```
+
+
+```{r}
+ratio_profile <- meta_average(LFCs)
+```
+
+```{r}
+plot_profile(ratio_profile) +
+  ylab('mean log2FC siCPSF73/ctrl')
+```
