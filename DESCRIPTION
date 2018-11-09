@@ -1,0 +1,24 @@
+Package: RMetaTools
+Type: Package
+Title: Tools For Metagene Analysis
+Version: 0.1
+Date: 2016-05-31
+Authors@R: person("Manfred", "Schmid",
+  email = "ms@mbg.au.dk",
+  role = c("aut", "cre"))
+Description: Package for creating metagene plots, including functions to import metagene data produced by deeptools and
+    bwtool.
+License: GPL-2
+Depends:
+    tidyverse,
+    broom,
+    magrittr,
+    rtracklayer,
+    jsonlite
+Suggests:
+    BSgenome.Hsapiens.UCSC.hg19,
+    knitr,
+    rmarkdown
+LazyData: NA
+RoxygenNote: 6.0.1
+VignetteBuilder: knitr
