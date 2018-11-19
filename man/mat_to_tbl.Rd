@@ -4,22 +4,10 @@
 \alias{mat_to_tbl}
 \title{Tidy Metagene Matrix}
 \usage{
-mat_to_tbl(mat, anno, anchor, upstream, downstream, window_size)
+mat_to_tbl(mat)
 }
 \arguments{
 \item{mat}{metagene matrix created from get_matrix}
-
-\item{anno}{GRanges object of regions to query.}
-
-\item{anchor}{'TSS', 'TES' or 'center.'}
-
-\item{upstream}{bp upstream of anchor (default=1000)}
-
-\item{downstream}{bp downstream of anchor (default=1000)}
-
-\item{window_size}{size for binning in bp (default=1, ie no binning)}
-
-\item{strand}{strand of anno to use (default='+')}
 }
 \value{
 matrix with columns from most upstream to most downstream and rows are the individual regions.
@@ -28,7 +16,7 @@ matrix with columns from most upstream to most downstream and rows are the indiv
 Converts metagene matrix into a tidy tbl.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
+Converts metagene matrix to tbl using rownames and colnames information to assign a column *name* and *rel_pos* respectively.
 }
 \examples{
 

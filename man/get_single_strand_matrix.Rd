@@ -21,7 +21,7 @@ get_single_strand_matrix(bw, anno, upstream = 1000, downstream = 1000,
 \item{window_size}{size for binning in bp (default=1, ie no binning)}
 }
 \value{
-matrix with columns from most upstream to most downstream and rows are the individual regions from specified strand.
+matrix with columns from most upstream to most downstream and rows are the individual regions from specified strand. rownames are set as name column from anno. colnames are set to start position of each window.
 }
 \description{
 Creates metagene matrix for single bigwig file.

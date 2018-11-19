@@ -23,7 +23,7 @@ get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
 \item{strand}{strand of anno to use (default='+')}
 }
 \value{
-matrix with columns from most upstream to most downstream and rows are the individual regions.
+matrix with columns from most upstream to most downstream and rows are the individual regions. Rownames are the Name column from the bed file.
 }
 \description{
 Creates metagene matrix for both strands using 1 or 2 bigwig files.
