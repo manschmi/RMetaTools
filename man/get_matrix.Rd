@@ -5,7 +5,7 @@
 \title{Metagene Matrix}
 \usage{
 get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
-  window_size = 1)
+  window_size = 1, negate_neg_strand_values = FALSE)
 }
 \arguments{
 \item{bw_plus}{filename for plus strand bigwig file.}
@@ -20,6 +20,8 @@ get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
 
 \item{window_size}{size for binning in bp (default=1, ie no binning)}
 
+\item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
+
 \item{strand}{strand of anno to use (default='+')}
 }
 \value{
@@ -29,7 +31,7 @@ matrix with columns from most upstream to most downstream and rows are the indiv
 Creates metagene matrix for both strands using 1 or 2 bigwig files.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
+Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
 }
 \examples{
 

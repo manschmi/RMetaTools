@@ -5,7 +5,7 @@
 \title{Metagene Matrix}
 \usage{
 metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream, downstream,
-  window_size)
+  window_size, negate_neg_strand_values = FALSE)
 }
 \arguments{
 \item{bw_plus}{bigwig filename for plus strand signal}
@@ -22,6 +22,8 @@ metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream, downstream,
 
 \item{window_size}{size for binning in bp (default=1, ie no binning)}
 
+\item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
+
 \item{strand}{strand of anno to use (default='+')}
 }
 \value{
@@ -31,13 +33,13 @@ Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (pos
 Computes a metagene matrix from scratch.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame.
+Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
 }
 \examples{
 
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, 1000, 1000, 50)
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, 'center', 1000, 1000, 50)
 
 }

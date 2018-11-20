@@ -70,21 +70,26 @@ meta_regions <- function(bed,
 #'
 #' @export
 get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, window=1, strand="+") {
+
+  ##handling specific strand and order to ensure correct output naming
   strand_anno <- anno[strand(anno)==strand]
   seqlevels(strand_anno) <- sort(seqlevels(strand_anno))
   strand_anno <- sort(strand_anno)
 
+  ##ensure to query only chrs present in bigwig,
+  ## ie otherwise import(bw, ...) will return in error
   bw_chrs <- seqlevels(BigWigFile(bw))
   contained_chrs <- seqlevels(strand_anno)[seqlevels(strand_anno) %in% bw_chrs]
 
-  if (length(contained_chrs) != length(seqlevels(strand_anno)) ) {
+  if (length(contained_chrs) != length(seqlevels(strand_anno))) {
     strand_anno <- strand_anno[seqlevels(strand_anno) %in% contained_chrs,]
     warning(paste0('ignoring chromosomes from annotation file not present in the bigwig file for strand: ', strand,
                    ': ', paste0(seqlevels(strand_anno)[!(seqlevels(strand_anno) %in% bw_chrs)])))
     }
 
-  mat <- as.matrix(rtracklayer::import(bw, which=strand_anno, as='NumericList'))
-
+  mat <- as.matrix(rtracklayer::import(bw,
+                                       which=strand_anno,
+                                       as='NumericList'))
 
   if (window > 1) {
     size <- upstream+downstream-1
@@ -93,8 +98,14 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, w
     }else if(strand=="-"){
       wins <- rev(seq(1,size, window))
     }
-    mat <- lapply(wins, function(i) rowMeans(mat[,i:(i+window-1)])) %>% bind_cols
+
+    mat <- lapply(wins, function(i) rowMeans(mat[,i:(i+window-1)])) %>%
+      bind_cols %>%
+      data.frame
+  } else if (strand=="-"){
+    mat <- mat[,ncol(mat):1]
   }
+
   rownames(mat) <- strand_anno$name
   colnames(mat) <- seq(-upstream, downstream-1, window)
 
@@ -113,8 +124,8 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, w
 #' @param downstream bp downstream of anchor (default=1000)
 #' @param window_size size for binning in bp (default=1, ie no binning)
 #' @param strand strand of anno to use (default='+')
-#'
-#' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
+#' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
+#' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
 #'
 #' @return matrix with columns from most upstream to most downstream and rows are the individual regions. Rownames are the Name column from the bed file.
 #'
@@ -131,9 +142,12 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, w
 #' mat <- get_matrix(bw, bw, regions, 1000, 1000, 50)
 #'
 #' @export
-get_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, window_size = 1) {
+get_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, window_size = 1, negate_neg_strand_values=FALSE) {
   smat <- get_single_strand_matrix(bw_plus, anno, upstream, downstream, window_size, strand="+")
   asmat <- get_single_strand_matrix(bw_minus, anno, upstream, downstream, window_size, strand="-")
+  if (negate_neg_strand_values) {
+    asmat <- -asmat
+  }
   rbind(smat, asmat)
 }
 
@@ -185,8 +199,9 @@ mat_to_tbl <- function(mat) {
 #' @param downstream bp downstream of anchor (default=1000)
 #' @param window_size size for binning in bp (default=1, ie no binning)
 #' @param strand strand of anno to use (default='+')
+#' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
 #'
-#' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame.
+#' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
 #'
 #' @return Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (position in bp relative to *anchor*), value (averaged value from bigwig file).
 #'
@@ -195,10 +210,10 @@ mat_to_tbl <- function(mat) {
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, 1000, 1000, 50)
+#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, 'center', 1000, 1000, 50)
 #'
 #' @export
-metagene_matrix <- function(bw_plus, bw_minus, anno, anchor, upstream, downstream, window_size) {
+metagene_matrix <- function(bw_plus, bw_minus, anno, anchor, upstream, downstream, window_size, negate_neg_strand_values=FALSE) {
   tryCatch(
     regions <- RMetaTools::meta_regions(anno, anchor, upstream, downstream, window_size),
     error = function(c) {
@@ -208,7 +223,7 @@ metagene_matrix <- function(bw_plus, bw_minus, anno, anchor, upstream, downstrea
   )
 
   tryCatch(
-    mat <- RMetaTools::get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size),
+    mat <- RMetaTools::get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size, negate_neg_strand_values),
     error = function(c) {
       c$message <- paste0("Error while trying to create  metagene matrix.\n", c$message)
       stop(c)
@@ -332,6 +347,3 @@ plot_profile <- function(meta_tbl, color_by=NULL){
     theme_bw() +
     theme(panel.grid = element_blank())
 }
-
-
-
