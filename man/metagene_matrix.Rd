@@ -12,7 +12,7 @@ metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream, downstream,
 
 \item{bw_minus}{bigwig filename for minus strand signal}
 
-\item{anno}{Bed filename for annotations to use.}
+\item{anno}{Bed filename for annotations to use OR a GRanges object (see Details).}
 
 \item{anchor}{'TSS', 'TES' or 'center.'}
 
@@ -34,6 +34,7 @@ Computes a metagene matrix from scratch.
 }
 \details{
 Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
+When using a GRanges object for anno, this assumes the bigwigs will be queries from start to end! All ranges must be exactly same size!
 }
 \examples{
 

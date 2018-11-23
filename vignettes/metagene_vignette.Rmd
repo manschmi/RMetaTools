@@ -19,16 +19,27 @@ knitr::opts_chunk$set(
 ```
 
 
-## Load Package
+
+# Install and Load Package
+
+TODO: INSTALL
 
 ```{r}
 library('RMetaTools')
 ```
 
 
-## Loading Regions
 
-Using a bed file this will create a range around an anchor point *TSS*, *TES* or *center*. Note, under the hood this uses rtracklayer to load, so gtfs etc should work, but non-conventional columns in your files may cause this to fail.
+
+# Metagene Analysis with RMetaTools
+
+
+
+#### Load metagene values
+
+First step is to define the regions of interest.
+
+Using a bed file this tool will query a range around an anchor point *TSS*, *TES* or *center*. Note, under the hood this uses rtracklayer to load, so gtfs etc should work, but non-conventional columns in your files may cause this to fail.
 
 ```{r}
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
@@ -39,59 +50,39 @@ downstream = 1000
 window_size = 50
 ```
 
-```{r}
-regions <- meta_regions(bedfile, 'TSS', upstream, downstream, window_size)
 
-regions
-```
-
-
-## Create a metagene matrix
+Track files, this are usually 2 bigwig files for stranded data. If you are assaying unstranded data use the same bigwig file for bw_plus and bw_minus.
 
 ```{r}
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 
-mat <- get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size)
+meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
 
-head(mat)
-```
-
-
-this matrix can be directly plotted either as heatmap or colMeans, etc...
-```{r}
-heatmap(as.matrix(mat), Rowv = NA, Colv = NA, labRow = NA, labCol = NA)
-```
-
-
-```{r}
-plot(colSums(mat), type='l')
+meta_tbl
 ```
 
 
 
-## tidy metagene analysis
 
-I prefer to use tidyverse logic for further analysis even though that me get problematic for big datasets.
-
-Convert the matrix to fully annotated tidy tbl can be done with the built-in function.
-```{r}
-(tidy_meta <- mat_to_tbl(mat, regions, anchor, upstream, downstream, window_size))
-```
+#### Plot metagene values
 
 There is also a built-in heatmap plotter for the tidy data
 ```{r}
-plot_htmp(tidy_meta)
+plot_htmp(meta_tbl)
 ```
 
 
 May be useful to represent as log2 values
 ```{r}
-log2_tidy_meta <- mutate(tidy_meta, value=log2(value+1))
+log2_meta_tbl <- mutate(meta_tbl, value=log2(value+1))
 
-plot_htmp(log2_tidy_meta) +
+plot_htmp(log2_meta_tbl) +
   scale_fill_gradient(low='white', high='navyblue') + #custom color scheme
-  coord_fixed(ratio = 4) #y/x aspect ratio of output plot
+  coord_fixed(ratio = 4) +#y/x aspect ratio of output plot
+  theme(axis.text.x = element_text(angle=45, hjust=1), #rotate x axis labels
+        axis.title.y = element_blank()) +#remove y axis title
+  xlab('bp to PROMPT TSS')
 ```
 
 
@@ -101,37 +92,73 @@ plot_htmp(log2_tidy_meta) +
 
 So far this is simply doing a one-sample t.test which computes mean and parametric confidence intervals.
 ```{r}
-log2_tidy_meta_avg <- meta_average(log2_tidy_meta)
+log2_meta_tbl_avgs <- meta_average(log2_meta_tbl)
 ```
 
 This can be plotted easily
 ```{r}
-plot_profile(log2_tidy_meta_avg)
+plot_profile(log2_meta_tbl_avgs)
 ```
 
 
 
-## Recipe: order heatmap rows using sum of values per row
+
+# Recipes
+
+## Recipe: order heatmap rows 
+#### using sum of values per row
 
 To order heatmap rows in ggplot2 requires a bit of work.
 ie to order according to the sum in each row, we first compute and order '*by-hand*'.
 ```{r}
-value_order <- log2_tidy_meta %>%
-  group_by(gene) %>%
+value_order <- log2_meta_tbl %>%
+  filter(relpos == 0 | relpos==50) %>% #optional: select ie first 2 50bp intervals from TSS
+  group_by(name) %>%
   summarize(total_value = sum(value)) %>%
   arrange(total_value) %$%
-  gene
+  name
 ```
 
 We can apply this ordering to the tbl using *factor()*.
 ```{r}
-log2_tidy_meta %>%
-  mutate(gene = factor(gene, levels=value_order)) %>%
+log2_meta_tbl %>%
+  mutate(name = factor(name, levels=value_order)) %>%
   plot_htmp(., do_interpolate = TRUE) +
   scale_fill_gradient(low='white', high='navyblue')
 ```
   
-  
+
+#### using region size
+
+The actual annotations are never used in the default pipeline but you can get the info from the name.
+```{r}
+size_order <- log2_meta_tbl %>%
+  distinct(name) %>%
+  separate(name, c('chr', 'start', 'end'), sep='\t', extra='drop', remove = FALSE) %>%
+  mutate(region_size = as.integer(end) - as.integer(start)) %>%
+  dplyr::select(name, region_size) %>%
+  arrange(region_size)
+```
+
+Then apply the order as factor levels as above.
+```{r}
+p <- log2_meta_tbl %>%
+  mutate(name = factor(name, levels=size_order$name)) %>%
+  left_join(., size_order) %>%
+  plot_htmp(., do_interpolate = TRUE) +
+  scale_fill_gradient(low='white', high='navyblue')
+
+p
+
+```
+
+and add lines for anchor and regions size (ups: not tested rigorously):
+```{r}
+p +
+  geom_vline(xintercept = 0, size=.1, color='black', alpha=.5) +
+  geom_point(data = mutate(size_order, value=0), aes(x=region_size, y=name), size=.1, color='black', alpha=.5, stroke=0)
+```
+
 ## Recipe: add another matrix side-by-side
 
 First create the new matrix.
@@ -139,28 +166,29 @@ First create the new matrix.
 bw_plus2 <- system.file("extdata", "GSM1573839_mNET_8WG16_siCPSF73_plus_hg38.bw", package = "RMetaTools")
 bw_minus2 <- system.file("extdata", "GSM1573839_mNET_8WG16_siCPSF73_minus_hg38.bw", package = "RMetaTools")
 
-mat2 <- get_matrix(bw_plus2, bw_minus2, regions, upstream, downstream, window_size)
+meta_tbl2 <- metagene_matrix(bw_plus2, bw_minus2, bedfile, anchor, upstream, downstream, window_size)
 
-tidy_meta2 <- mat_to_tbl(mat2, regions, anchor, upstream, downstream, window_size)
 ```
 
 
 Before we combine, better add some identifier column, ie 'condition'.
 ```{r}
-tidy_meta$condition <- 'ctrl'
-tidy_meta2$condition <- 'siCPSF73'
+meta_tbl$condition <- 'ctrl'
+meta_tbl2$condition <- 'siCPSF73'
 ```
 
 simply bind_rows then
 ```{r}
-both_meta <- bind_rows(tidy_meta, tidy_meta2)
+both_meta <- bind_rows(meta_tbl, meta_tbl2)
 log2_both_meta <- mutate(both_meta, value=log2(value+1))
 ```
 
 
 #### heatmap side-by-side
 ```{r}
-plot_htmp(log2_both_meta) +
+log2_both_meta %>%
+  mutate(name = factor(name, levels=value_order)) %>%
+plot_htmp(.) +
   scale_fill_gradient(low='white', high='navyblue') +
   facet_grid(.~condition)
 ```
@@ -187,7 +215,75 @@ plot_profile(log2_both_meta_avg, color_by='condition')
 
 
 
-#### Recipe: log2 ratio between conditions
+
+
+## Recipe: add another group of annotations "on the bottom"
+
+Note: this can be ie the antisense strand!
+
+First create the new matrix to be put on the bottom. We use the set with already 2 columns ;-)
+
+```{r}
+bottom1 <- metagene_matrix(bw_minus, bw_plus, bedfile, anchor, upstream, downstream, window_size)  %>%
+  mutate(condition='ctrl')
+
+bottom2 <- metagene_matrix(bw_minus2, bw_plus2, bedfile, anchor, upstream, downstream, window_size) %>%
+  mutate(condition='siCPSF73')
+
+bottom <- bind_rows(bottom1, bottom2) %>%
+  mutate(strand = 'antisense')
+```
+
+```{r}
+log2_meta_all <- both_meta %>%
+  mutate(strand = 'sense') %>%
+  bind_rows(., bottom) %>%
+  mutate(value=log2(value+1),
+         strand=factor(strand, levels=c('sense', 'antisense')))
+```
+
+
+#### heatmap 2x2 matrix
+```{r}
+log2_meta_all %>%
+  mutate(name = factor(name, levels=value_order)) %>%
+plot_htmp(.) +
+  scale_fill_gradient(low='white', high='navyblue') +
+  facet_grid(strand~condition)
+```
+
+
+#### profiles of 2x2 dataset
+
+average of a combined dataset, should work
+```{r}
+log2_meta_all_avg <- meta_average(log2_meta_all)
+```
+
+can be visualized as side-by-side plot:
+```{r}
+plot_profile(log2_meta_all_avg) +
+  facet_grid(strand~condition)
+```
+
+
+#### 2x2 Strand vs antisense compound plot:
+
+```{r}
+log2_meta_all_avg %>%
+  mutate(estimate = ifelse(strand == 'antisense', -estimate, estimate),
+         conf.low = ifelse(strand == 'antisense', -conf.low, conf.low),
+         conf.high = ifelse(strand == 'antisense', -conf.high, conf.high)) %>%
+plot_profile(., color_by='condition') +
+  facet_grid(strand~., scales='free') +
+  theme_minimal()
+```
+
+
+
+
+
+## Recipe: log2 ratio between conditions
 
 using the tidy tbl this is pretty straightforward:
 ```{r}
@@ -212,3 +308,122 @@ ratio_profile <- meta_average(LFCs)
 plot_profile(ratio_profile) +
   ylab('mean log2FC siCPSF73/ctrl')
 ```
+
+
+## Recipe: p value of log2 ratio between conditions
+
+using a t.test would require roughly normal distributed data. This is often not the case due to highly 0-inflated data. As shown here for the density of signals in the central bins. The TSS and 50bp bin are close to normal, but the others are highly skewed towards 0s.
+
+```{r}
+log2_both_meta %>%
+  filter(relpos > -100 & relpos < 200) %>%
+  mutate(relpos = factor(relpos)) %>%
+  ggplot(., aes(x=value, color=relpos)) +
+  geom_density() +
+  facet_grid(.~condition) +
+  theme_minimal()
+```
+
+So its probably more appropriate to do a non-parametric test ie wilcoxon rank sum test. Together with the tidy function from R package *broom*.
+
+```{r}
+suppressWarnings(library(broom))
+```
+
+
+```{r}
+(LFC_wilcox_p <- log2_both_meta %>%
+  spread(condition, value) %>%
+  group_by(relpos) %>%
+  do(tidy(wilcox.test(.$siCPSF73, .$ctrl))))
+```
+
+This applies a significance test for every position. Hence, p-values need to be corrected for multiple testing:
+
+```{r}
+LFC_wilcox_p %<>%
+  mutate(padj = p.adjust(p.value))
+```
+
+
+plot the adjusted p values, ie visually better as -log10(p.value)
+
+```{r}
+ggplot(LFC_wilcox_p,
+       aes(x=relpos, y=-log10(padj))) +
+  geom_line()
+```
+
+
+## Recipe: bigwigs where minus bigwig values are represented as negatives
+
+Some people present values of minus strand data as negatives. This can help visualization in Genome Browser, etc.. To make such datasets directly accessible I added an option to negate negative strand bigwigs: 
+```{r}
+bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
+
+meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size, negate_neg_strand_values = TRUE)
+
+meta_tbl
+```
+
+
+# Individual Steps in the Pipeline
+
+## Loading Regions
+
+Using a bed file this will create a range around an anchor point *TSS*, *TES* or *center*. Note, under the hood this uses rtracklayer to load, so gtfs etc should work, but non-conventional columns in your files may cause this to fail.
+
+```{r}
+bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
+
+anchor = 'TSS'
+upstream = 1000
+downstream = 1000
+window_size = 50
+```
+
+```{r}
+regions <- meta_regions(bedfile, 'TSS', upstream, downstream, window_size)
+
+regions
+```
+
+
+## Create a metagene matrix
+
+On top of the general method one can also get the intermediate non-tidy matrix separately:
+```{r}
+bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
+
+mat <- get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size)
+
+head(mat)
+```
+
+
+this matrix can be directly plotted either as heatmap or colMeans, etc...
+```{r}
+heatmap(as.matrix(mat), Rowv = NA, Colv = NA, labRow = NA, labCol = NA)
+```
+
+
+```{r}
+plot(colSums(mat), type='l')
+```
+
+
+Conversion to tidy format is also implemented as function. This should return exactly same data as the metagene_matrix functioncreated using the same settings.
+```{r}
+(tidy_meta <- mat_to_tbl(mat))
+```
+
+
+
+# Session
+
+```{r}
+sessionInfo()
+```
+

@@ -26,21 +26,26 @@ meta_regions <- function(bed,
   print('loading file')
 
   anno <- rtracklayer::import(bed)
+  anno$original_start <- start(anno)
+  anno$original_end <- end(anno)
+  if( !('name' %in% colnames(mcols(anno))) ) {
+    anno$name <- paste0('region', seq(length(anno)))
+  }
 
   print('get range')
   if(anchor == 'TSS'){
-    ranges(anno) <- start(ranges(anno))
+    ranges(anno) <- start(anno)
   }else if(anchor == 'TES'){
-    ranges(anno) <- end(ranges(anno))
+    ranges(anno) <- end(anno)
   }else if(anchor == 'center'){
-    ends <- end(ranges(anno))
-    starts <- start(ranges(anno))
+    ends <- end(anno)
+    starts <- start(anno)
     ranges(anno) <- starts + (ends-starts)/2
   }else{
     stop('unknown anchor point, use TSS, TES or center')
   }
-  start(ranges(anno)) <- start(ranges(anno)) - upstream
-  end(ranges(anno)) <- end(ranges(anno)) + downstream - 1 #0 counts as first position
+  start(anno) <- start(anno) - upstream
+  end(anno) <- end(anno) + downstream - 1 #0 counts as first position
 
   return(anno)
 }
@@ -106,7 +111,13 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, w
     mat <- mat[,ncol(mat):1]
   }
 
-  rownames(mat) <- strand_anno$name
+  rownames(mat) <- paste(seqnames(strand_anno),
+                         strand_anno$original_start,
+                         strand_anno$original_end,
+                         strand_anno$name,
+                         strand(strand_anno),
+                         sep = '\t')
+
   colnames(mat) <- seq(-upstream, downstream-1, window)
 
   mat
@@ -193,7 +204,7 @@ mat_to_tbl <- function(mat) {
 #'
 #' @param bw_plus bigwig filename for plus strand signal
 #' @param bw_minus bigwig filename for minus strand signal
-#' @param anno Bed filename for annotations to use.
+#' @param anno Bed filename for annotations to use OR a GRanges object (see Details).
 #' @param anchor 'TSS', 'TES' or 'center.'
 #' @param upstream bp upstream of anchor (default=1000)
 #' @param downstream bp downstream of anchor (default=1000)
@@ -202,7 +213,7 @@ mat_to_tbl <- function(mat) {
 #' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
 #'
 #' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
-#'
+#' When using a GRanges object for anno, this assumes the bigwigs will be queries from start to end! All ranges must be exactly same size!
 #' @return Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (position in bp relative to *anchor*), value (averaged value from bigwig file).
 #'
 #' @examples
@@ -214,13 +225,19 @@ mat_to_tbl <- function(mat) {
 #'
 #' @export
 metagene_matrix <- function(bw_plus, bw_minus, anno, anchor, upstream, downstream, window_size, negate_neg_strand_values=FALSE) {
-  tryCatch(
-    regions <- RMetaTools::meta_regions(anno, anchor, upstream, downstream, window_size),
-    error = function(c) {
-      c$message <- paste0("Error while trying to create metagene regions from bed file: ", anno, '\n', c$message)
-      stop(c)
-    }
-  )
+  if( class(anno) == 'GRanges' ) {
+    regions <- anno
+  } else if ( is.character(class(anno)) ) {
+    tryCatch(
+      regions <- RMetaTools::meta_regions(anno, anchor, upstream, downstream, window_size),
+      error = function(c) {
+        c$message <- paste0("Error while trying to create metagene regions from bed file: ", anno, '\n', c$message)
+        stop(c)
+      }
+    )
+  } else {
+    stop(paste0('failed to interpret regions', anno))
+  }
 
   tryCatch(
     mat <- RMetaTools::get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size, negate_neg_strand_values),
