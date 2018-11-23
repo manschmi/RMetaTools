@@ -22,7 +22,17 @@ knitr::opts_chunk$set(
 
 # Install and Load Package
 
-TODO: INSTALL
+#### INSTALL on ie genome.dk
+
+Handling R packages can be tricky, ie installing devtools which will be needed failed for me so better stick to 'conda' for handling such annoyancies.
+
+```{bash, eval=F}
+conda create -n R_env r-essentials
+
+conda activate R_env
+conda install devtools
+```
+
 
 ```{r}
 library('RMetaTools')
