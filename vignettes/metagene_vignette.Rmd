@@ -130,33 +130,47 @@ log2_meta_tbl %>%
 
 #### using region size
 
+ups for PROMPT annotation used above we only have TSS position but no actual size from start. For this better to use something else, ie snRNA.
+```{r}
+snRNA_bedfile <- system.file("extdata", "snRNA_MS31_hg38.bed", package = "RMetaTools")
+```
+
+```{r}
+snRNA_meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, snRNA_bedfile, anchor, upstream, downstream, window_size) %>%
+  mutate(value = log2(value+1))
+
+snRNA_meta_tbl
+```
+
+without ordering
+```{r}
+plot_htmp(snRNA_meta_tbl, do_interpolate = TRUE)
+```
+
 The actual annotations are never used in the default pipeline but you can get the info from the name.
 ```{r}
-size_order <- log2_meta_tbl %>%
+size_order <- snRNA_meta_tbl %>%
   distinct(name) %>%
   separate(name, c('chr', 'start', 'end'), sep='\t', extra='drop', remove = FALSE) %>%
   mutate(region_size = as.integer(end) - as.integer(start)) %>%
   dplyr::select(name, region_size) %>%
-  arrange(region_size)
+  arrange(-region_size)
 ```
 
 Then apply the order as factor levels as above.
 ```{r}
-p <- log2_meta_tbl %>%
+p <- snRNA_meta_tbl %>%
   mutate(name = factor(name, levels=size_order$name)) %>%
-  left_join(., size_order) %>%
-  plot_htmp(., do_interpolate = TRUE) +
-  scale_fill_gradient(low='white', high='navyblue')
+  plot_htmp(., do_interpolate = TRUE)
 
 p
-
 ```
 
 and add lines for anchor and regions size (ups: not tested rigorously):
 ```{r}
 p +
   geom_vline(xintercept = 0, size=.1, color='black', alpha=.5) +
-  geom_point(data = mutate(size_order, value=0), aes(x=region_size, y=name), size=.1, color='black', alpha=.5, stroke=0)
+  geom_point(data = mutate(size_order, value=0), aes(x=region_size, y=name), size=1, color='black', alpha=.5, stroke=0)
 ```
 
 ## Recipe: add another matrix side-by-side
