@@ -24,13 +24,34 @@ knitr::opts_chunk$set(
 
 #### INSTALL on ie genome.dk
 
-Handling R packages can be tricky, ie installing devtools which will be needed failed for me so better stick to 'conda' for handling such annoyancies.
+Handling R packages can be tricky, ie installing devtools which will be needed failed for me so better stick to 'conda' for handling such annoyancies. Ups: you will have to install conda as described in the genome.au.dk helppages.
 
+Run this in the Terminal, front-end: (ups can take a long time each step...). Just say *yes* to everything when asked.
 ```{bash, eval=F}
-conda create -n R_env r-essentials
+conda create -n RMetaTools_env
+conda activate RMetaTools_env
+conda install -c r r
+conda install -c r rstudio
+conda install -c r r-devtools
+conda install -c bioconda bioconductor-rtracklayer
+```
 
-conda activate R_env
-conda install devtools
+now go to backend activate the environment again and start R
+```{bash, eval=FALSE}
+srun --pty bash
+conda activate RMetaTools_env
+rstudio #or R if you prefer that, rstudio requires that you logged in with ssh -Y
+```
+
+
+install RMetaTools for use in RMetaTools_env at genome.dk:
+```{r}
+library(devtools)
+library(httr)
+set_config( config( ssl_verifypeer = 0L ) )
+options(unzip = "internal")
+
+install_github('manschmi/RMetaTools')
 ```
 
 
@@ -39,6 +60,7 @@ library('RMetaTools')
 ```
 
 
+Now you should be all set to try and runt he examples below and/or test with your own data!
 
 
 # Metagene Analysis with RMetaTools
