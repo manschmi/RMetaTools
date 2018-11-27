@@ -45,7 +45,7 @@ rstudio #or R if you prefer that, rstudio requires that you logged in with ssh -
 
 
 install RMetaTools for use in RMetaTools_env at genome.dk:
-```{r}
+```{r, eval=FALSE}
 library(devtools)
 library(httr)
 set_config( config( ssl_verifypeer = 0L ) )
@@ -55,11 +55,12 @@ install_github('manschmi/RMetaTools')
 ```
 
 
+load RMetaTools
 ```{r}
 library('RMetaTools')
 ```
 
-
+Hopefully this does not throw and error.
 Now you should be all set to try and runt he examples below and/or test with your own data!
 
 
@@ -263,9 +264,9 @@ plot_profile(log2_both_meta_avg, color_by='condition')
 
 
 
-## Recipe: add another group of annotations "on the bottom"
+## Recipe: Add antisense coverage for comparison "on the bottom"
 
-Note: this can be ie the antisense strand!
+For this example we simply invert plus_bw and minus_bw --> ie get the antisense coverage on same annotations. Alternatively you can use other bedfile but same bws as above...
 
 First create the new matrix to be put on the bottom. We use the set with already 2 columns ;-)
 
@@ -292,11 +293,67 @@ log2_meta_all <- both_meta %>%
 #### heatmap 2x2 matrix
 ```{r}
 log2_meta_all %>%
-  mutate(name = factor(name, levels=value_order)) %>%
+  mutate(name = factor(name, levels=value_order),
+         value = ifelse(strand == 'sense', value, -value)) %>%
 plot_htmp(.) +
-  scale_fill_gradient(low='white', high='navyblue') +
-  facet_grid(strand~condition)
+  scale_fill_gradient2(low='firebrick', mid='white', high='navyblue') +
+  facet_grid(strand~condition) +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.title.y = element_blank())
 ```
+
+#### heatmap sense antisense color overlay
+
+this is a bit iffy but can be faked by duplicate each rowname and offsetting accordingly
+
+rows of the heatmap are ordered by levels of 'name'. So we simply duplicate each name and order so that the positive strand values for each name are always followed by the negative strand values for the same name .
+
+This is the order we apply now:
+```{r}
+head(value_order)
+```
+
+lets make a value order for antisense
+
+
+put this 2 together zipped way
+
+```{r}
+zipped_value_order <- as.character(rbind(value_order,paste0(value_order, 'antisense')))
+
+head(zipped_value_order)
+```
+
+
+```{r}
+log2_meta_all %>%
+  mutate(name = ifelse(strand == 'antisense', name, paste0(value_order, 'antisense')),
+         name = factor(name, levels=zipped_value_order),
+         value = ifelse(strand == 'sense', value, -value)) %>%
+plot_htmp(.) +
+  scale_fill_gradient2(low='firebrick', mid='white', high='navyblue') +
+  facet_grid(.~condition) +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.title.y = element_blank())
+```
+
+another version would simply use a majority vote for each tile
+
+```{r}
+log2_meta_all %>%
+  spread(strand, value) %>%
+  mutate(value = ifelse(sense > antisense, sense, -antisense),
+         name = factor(name, levels=zipped_value_order)) %>%
+plot_htmp(.) +
+  scale_fill_gradient2(low='firebrick', mid='white', high='navyblue') +
+  facet_grid(.~condition) +
+  theme_minimal() +
+  theme(axis.text.y=element_blank(),
+        axis.title.y = element_blank())
+```
+
 
 
 #### profiles of 2x2 dataset
@@ -404,13 +461,8 @@ ggplot(LFC_wilcox_p,
 ## Recipe: bigwigs where minus bigwig values are represented as negatives
 
 Some people present values of minus strand data as negatives. This can help visualization in Genome Browser, etc.. To make such datasets directly accessible I added an option to negate negative strand bigwigs: 
-```{r}
-bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-
+```{r, eval=FALSE}
 meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size, negate_neg_strand_values = TRUE)
-
-meta_tbl
 ```
 
 
