@@ -108,8 +108,15 @@ plot_htmp(meta_tbl)
 
 May be useful to represent as log2 values
 ```{r}
-log2_meta_tbl <- mutate(meta_tbl, value=log2(value+1))
+(pseudocount <- min(meta_tbl$value[meta_tbl$value > 0]))
+```
 
+
+```{r}
+log2_meta_tbl <- mutate(meta_tbl, value=log2(value+pseudocount))
+```
+
+```{r}
 plot_htmp(log2_meta_tbl) +
   scale_fill_gradient(low='white', high='navyblue') + #custom color scheme
   coord_fixed(ratio = 4) +#y/x aspect ratio of output plot
@@ -118,6 +125,24 @@ plot_htmp(log2_meta_tbl) +
   xlab('bp to PROMPT TSS')
 ```
 
+this is fine, the only caveat here is that negatives are mentally a bit challenging, ie they still refer to "positive signal".
+
+so its much more paedogical to use pseudocount = 1
+
+```{r}
+log2_meta_tbl <- mutate(meta_tbl, value=log2(value+1))
+```
+
+```{r}
+plot_htmp(log2_meta_tbl) +
+  scale_fill_gradient(low='white', high='navyblue') + #custom color scheme
+  coord_fixed(ratio = 4) +#y/x aspect ratio of output plot
+  theme(axis.text.x = element_text(angle=45, hjust=1), #rotate x axis labels
+        axis.title.y = element_blank()) +#remove y axis title
+  xlab('bp to PROMPT TSS')
+```
+
+but obviously this also changes the appearance quite a bit, since low values are now very close to 0... matter of choice imho.
 
 
 
@@ -385,7 +410,6 @@ plot_profile(., color_by='condition') +
 
 
 
-
 ## Recipe: log2 ratio between conditions
 
 using the tidy tbl this is pretty straightforward:
@@ -410,6 +434,40 @@ ratio_profile <- meta_average(LFCs)
 ```{r}
 plot_profile(ratio_profile) +
   ylab('mean log2FC siCPSF73/ctrl')
+```
+
+
+
+## Recipe: sensitivity (Sandelin lab style) ratio between conditions instead of log2FC
+
+using the tidy tbl this is pretty straightforward:
+```{r}
+(pseudocount <- min(both_meta$value[both_meta$value > 0]))
+
+```
+
+```{r}
+(sensitivities <- both_meta %>%
+  mutate(value = value + pseudocount) %>%
+  spread(condition, value) %>%
+  mutate(value = (siCPSF73-ctrl)/max(siCPSF73, ctrl)) %>%
+  dplyr::select(-siCPSF73, -ctrl))
+```
+
+```{r}
+plot_htmp(sensitivities, color_by='value') +
+  scale_fill_gradient2(low='firebrick4', mid='white', high='navyblue', name="sensitivity = (siCPSF73-ctrl)/max(siCPSF73, ctrl)") +
+  coord_fixed(ratio = 4) 
+```
+
+
+```{r}
+sensitivity_profile <- meta_average(sensitivities)
+```
+
+```{r}
+plot_profile(sensitivity_profile) +
+  ylab('mean sensitibity siCPSF73/ctrl')
 ```
 
 
