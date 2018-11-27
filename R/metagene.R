@@ -44,8 +44,9 @@ meta_regions <- function(bed,
   }else{
     stop('unknown anchor point, use TSS, TES or center')
   }
-  start(anno) <- start(anno) - upstream
-  end(anno) <- end(anno) + downstream - 1 #0 counts as first position
+
+  start(anno) <- ifelse(strand(anno) == '+', start(anno) - upstream, start(anno) - downstream)
+  end(anno) <- ifelse(strand(anno) == '+', end(anno) + downstream - 1, end(anno) + upstream - 1) #0 counts as first position
 
   return(anno)
 }
