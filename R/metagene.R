@@ -23,7 +23,6 @@ meta_regions <- function(bed,
                         upstream = 1000,
                         downstream = 1000,
                         window_size = 1) {
-  print('loading file')
 
   anno <- rtracklayer::import(bed)
   anno$original_start <- start(anno)
@@ -32,21 +31,17 @@ meta_regions <- function(bed,
     anno$name <- paste0('region', seq(length(anno)))
   }
 
-  print('get range')
-  if(anchor == 'TSS'){
-    ranges(anno) <- start(anno)
-  }else if(anchor == 'TES'){
-    ranges(anno) <- end(anno)
-  }else if(anchor == 'center'){
-    ends <- end(anno)
-    starts <- start(anno)
-    ranges(anno) <- starts + (ends-starts)/2
-  }else{
-    stop('unknown anchor point, use TSS, TES or center')
-  }
+  strands <- as.vector(strand(anno))
+  anchor_position <- case_when(
+    (anchor == 'TSS' & strands == '-') ~ end(anno),
+    anchor == 'TSS' ~ start(anno),
+    anchor == 'TES' & strands == '-' ~ start(anno),
+    anchor == 'TES' ~ end(anno),
+    anchor == 'center' ~ as.integer(start(anno) + (end(anno)-start(anno))/2)
+  )
 
-  start(anno) <- ifelse(strand(anno) == '+', start(anno) - upstream, start(anno) - downstream)
-  end(anno) <- ifelse(strand(anno) == '+', end(anno) + downstream - 1, end(anno) + upstream - 1) #0 counts as first position
+  start(anno) <- ifelse(strand(anno) == '+', anchor_position - upstream, anchor_position - downstream)
+  end(anno) <- ifelse(strand(anno) == '+', anchor_position + downstream - 1, anchor_position + upstream - 1) #0 counts as first position
 
   return(anno)
 }
@@ -72,7 +67,7 @@ meta_regions <- function(bed,
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 #' regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-#' mat <- get_single_strand_matrix(bw_plus, regions, 1000, 1000, 50, '+')
+#' mat <- get_single_strand_matrix(bw_plus, regions, 1000, 5000, 50, '+')
 #'
 #' @export
 get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, window=1, strand="+") {
@@ -85,17 +80,20 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, w
   ##ensure to query only chrs present in bigwig,
   ## ie otherwise import(bw, ...) will return in error
   bw_chrs <- seqlevels(BigWigFile(bw))
-  contained_chrs <- seqlevels(strand_anno)[seqlevels(strand_anno) %in% bw_chrs]
+  contained_anno_rows <- which(seqnames(strand_anno) %in% bw_chrs)
 
-  if (length(contained_chrs) != length(seqlevels(strand_anno))) {
-    strand_anno <- strand_anno[seqlevels(strand_anno) %in% contained_chrs,]
+  if (length(contained_anno_rows) != length(strand_anno)) {
+    #failed_anno <- strand_anno[!(seqlevels(strand_anno) %in% contained_chrs),]
+    #strand_anno <- strand_anno[seqlevels(strand_anno) %in% contained_chrs,]
     warning(paste0('ignoring chromosomes from annotation file not present in the bigwig file for strand: ', strand,
-                   ': ', paste0(seqlevels(strand_anno)[!(seqlevels(strand_anno) %in% bw_chrs)])))
-    }
+                   ': ', paste0(seqlevels(strand_anno[-contained_anno_rows]))))
+  }
 
-  mat <- as.matrix(rtracklayer::import(bw,
-                                       which=strand_anno,
+  mat <- matrix(NA, nrow = length(strand_anno), ncol = upstream+downstream)
+  matc <- as.matrix(rtracklayer::import(bw,
+                                       which=strand_anno[contained_anno_rows],
                                        as='NumericList'))
+  mat[contained_anno_rows,] <- matc
 
   if (window > 1) {
     size <- upstream+downstream-1
@@ -122,7 +120,8 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, w
   colnames(mat) <- seq(-upstream, downstream-1, window)
 
   mat
-  }
+}
+
 
 
 #' Metagene Matrix

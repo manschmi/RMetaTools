@@ -34,6 +34,6 @@ Loads the bed file, extracts the position of the anchor point and creates ranges
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-mat <- get_single_strand_matrix(bw_plus, regions, 1000, 1000, 50, '+')
+mat <- get_single_strand_matrix(bw_plus, regions, 1000, 5000, 50, '+')
 
 }
