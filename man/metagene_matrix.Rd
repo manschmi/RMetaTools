@@ -4,8 +4,9 @@
 \alias{metagene_matrix}
 \title{Metagene Matrix}
 \usage{
-metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream, downstream,
-  window_size, negate_neg_strand_values = FALSE)
+metagene_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
+  window_size = 1, collapse_fun = rowMeans, collapse_fun_args = NULL,
+  negate_neg_strand_values = FALSE)
 }
 \arguments{
 \item{bw_plus}{bigwig filename for plus strand signal}
@@ -14,17 +15,19 @@ metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream, downstream,
 
 \item{anno}{Bed filename for annotations to use OR a GRanges object (see Details).}
 
-\item{anchor}{'TSS', 'TES' or 'center.'}
-
 \item{upstream}{bp upstream of anchor (default=1000)}
 
 \item{downstream}{bp downstream of anchor (default=1000)}
 
 \item{window_size}{size for binning in bp (default=1, ie no binning)}
 
+\item{collapse_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
+
+\item{collapse_fun_args}{additional arguments passed to collapse_fun (default=NULL)}
+
 \item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
 
-\item{strand}{strand of anno to use (default='+')}
+\item{anchor}{'TSS', 'TES' or 'center.'}
 }
 \value{
 Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (position in bp relative to *anchor*), value (averaged value from bigwig file).

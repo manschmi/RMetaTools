@@ -4,8 +4,7 @@
 \alias{meta_regions}
 \title{Metagene Regions}
 \usage{
-meta_regions(bed, anchor = "TSS", upstream = 1000, downstream = 1000,
-  window_size = 1)
+meta_regions(bed, anchor = "TSS", upstream = 1000, downstream = 1000)
 }
 \arguments{
 \item{bed}{filename for bed file.}
@@ -15,8 +14,6 @@ meta_regions(bed, anchor = "TSS", upstream = 1000, downstream = 1000,
 \item{upstream}{bp upstream of anchor (default=1000)}
 
 \item{downstream}{bp downstream of anchor (default=1000)}
-
-\item{window_size}{size for binning in bp (default=1, ie no binning)}
 }
 \value{
 GRanges with regions.
@@ -30,6 +27,6 @@ Loads the bed file, extracts the position of the anchor point and creates ranges
 \examples{
 
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 
 }
