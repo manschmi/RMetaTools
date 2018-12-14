@@ -4,8 +4,8 @@
 \alias{metagene_matrix}
 \title{Metagene Matrix}
 \usage{
-metagene_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
-  window_size = 1, collapse_fun = rowMeans, collapse_fun_args = NULL,
+metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream = 1000,
+  downstream = 1000, window_size = 1, collapse_fun = rowMeans,
   negate_neg_strand_values = FALSE)
 }
 \arguments{
@@ -15,6 +15,8 @@ metagene_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
 
 \item{anno}{Bed filename for annotations to use OR a GRanges object (see Details).}
 
+\item{anchor}{'TSS', 'TES' or 'center.'}
+
 \item{upstream}{bp upstream of anchor (default=1000)}
 
 \item{downstream}{bp downstream of anchor (default=1000)}
@@ -23,11 +25,7 @@ metagene_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
 
 \item{collapse_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
 
-\item{collapse_fun_args}{additional arguments passed to collapse_fun (default=NULL)}
-
 \item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
-
-\item{anchor}{'TSS', 'TES' or 'center.'}
 }
 \value{
 Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (position in bp relative to *anchor*), value (averaged value from bigwig file).
@@ -44,6 +42,8 @@ When using a GRanges object for anno, this assumes the bigwigs will be queries f
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, 'center', 1000, 1000, 50)
+anno=bedfile;anchor='center';upstream=1000;downstream=1000;window_size=10
+collapse_fun = rowMeans;negate_neg_strand_values=FALSE
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
 
 }

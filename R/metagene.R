@@ -53,7 +53,6 @@ meta_regions <- function(bed,
 #' @param anno GRanges object of regions to query.
 #' @param upstream bp upstream of anchor (default=1000)
 #' @param downstream bp downstream of anchor (default=1000)
-#' @param strand strand of anno to use (default='+')
 #'
 #' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
 #'
@@ -63,11 +62,11 @@ meta_regions <- function(bed,
 #'
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 #' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-#' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-#' mat <- get_single_strand_matrix(bw_plus, regions, 1000, 5000, '+')
+#' bw <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+#' mat <- get_single_strand_matrix(bw=bw, anno=regions, upstream=1000, downstream=5000)
 #'
 #' @export
-get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, strand="+") {
+get_single_strand_matrix <- function(bw, anno, upstream, downstream) {
 
   ##handling specific strand and order to ensure correct output naming
   seqlevels(anno) <- sort(seqlevels(anno))
@@ -76,26 +75,22 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, s
   ##ensure to query only chrs present in bigwig,
   ## ie otherwise import(bw, ...) will return in error
   bw_chrs <- seqlevels(BigWigFile(bw))
-  contained_anno_rows <- which(seqnames(anno) %in% bw_chrs)
-
+  contained_anno_rows <- which(as.character(seqnames(anno)) %in% bw_chrs)
   if (length(contained_anno_rows) != length(anno)) {
     warning(paste0('ignoring chromosomes from annotation file not present in the bigwig file for strand: ', strand,
                    ': ', paste0(seqlevels(anno[-contained_anno_rows]))))
   }
-
   mat <- matrix(NA, nrow = length(anno), ncol = upstream+downstream)
   matc <- as.matrix(rtracklayer::import(bw,
                                        which=anno[contained_anno_rows],
                                        as='NumericList'))
   mat[contained_anno_rows,] <- matc
-
   rownames(mat) <- paste(seqnames(anno),
                          anno$original_start,
                          anno$original_end,
                          anno$name,
                          strand(anno),
                          sep = '\t')
-
   colnames(mat) <- seq(-upstream, downstream-1)
 
   mat
@@ -110,7 +105,6 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, s
 #' @param mat matrix
 #' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
 #' @param window_size size for binning in bp (default=10, ie average over 10nt)
-#' @param ... additional arguments passed to collapse_fun
 #'
 #' @details for a matrix with ncol=100 and window_size=10, will return a matrix with ncol=10. collapse_fun is a function that functions as ie rowMeans (the default) or rowSums.
 #'
@@ -123,16 +117,16 @@ get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, s
 #' dim(matc)
 #'
 #' log2RowMeans <- function(mat, pseudocount=1){apply(mat,1,function(row) mean(log2(row+pseudocount)))}
-#' matc <- collapse_to_window_size(mat, log2RowMeans, 10, pseudocount = .1)
+#' matc <- collapse_to_window_size(mat, log2RowMeans, 10)
 #' dim(matc)
 #'
 #' @export
-collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 10, ...) {
+collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 10) {
   if (window_size > 1) {
     size <- ncol(mat)
     wins <- seq(1,size, window_size)
 
-    matc <- lapply(wins, function(i) collapse_fun(mat[,i:(i+window_size-1)], ...)) %>%
+    matc <- lapply(wins, function(i) collapse_fun(mat[,i:(i+window_size-1)])) %>%
       bind_cols %>%
       as.matrix
 
@@ -157,7 +151,6 @@ collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 
 #' @param downstream bp downstream of anchor (default=1000)
 #' @param window_size size for binning in bp (default=1, ie no binning)
 #' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
-#' @param collapse_fun_args additional arguments passed to collapse_fun (default=NULL)
 #' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
 #' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream using collapse_fun average over window_size regions. See \code{\link{collapse_to_window_size}} for more info about averaging over window size. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
 #'
@@ -177,7 +170,7 @@ collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 
 #'
 #' @export
 get_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, window_size = 1,
-                       collapse_fun = rowMeans, collapse_fun_args = NULL,
+                       collapse_fun = rowMeans,
                        negate_neg_strand_values=FALSE) {
   smat <- get_single_strand_matrix(bw_plus, anno[strand(anno)=="+"], upstream, downstream)
   asmat <- get_single_strand_matrix(bw_minus, anno[strand(anno)=="-"], upstream, downstream)
@@ -187,7 +180,7 @@ get_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, 
   }
   mat <- rbind(smat, asmat)
   if(window_size > 1) {
-    mat <- collapse_to_window_size(mat, collapse_fun, window_size, collapse_fun_args)
+    mat <- collapse_to_window_size(mat, collapse_fun, window_size)
   }
   mat
 }
@@ -210,7 +203,7 @@ get_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, 
 #' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-#' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)
+#' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 50)
 #' tidy_meta <- mat_to_tbl(mat)
 #'
 #' @export
@@ -240,7 +233,6 @@ mat_to_tbl <- function(mat) {
 #' @param downstream bp downstream of anchor (default=1000)
 #' @param window_size size for binning in bp (default=1, ie no binning)
 #' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
-#' @param collapse_fun_args additional arguments passed to collapse_fun (default=NULL)
 #' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
 #'
 #' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
@@ -252,17 +244,20 @@ mat_to_tbl <- function(mat) {
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, 'center', 1000, 1000, 50)
+#' anno=bedfile;anchor='center';upstream=1000;downstream=1000;window_size=10
+#' collapse_fun = rowMeans;negate_neg_strand_values=FALSE
+#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
 #'
 #' @export
-metagene_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, window_size = 1,
-                            collapse_fun = rowMeans, collapse_fun_args = NULL,
+metagene_matrix <- function(bw_plus, bw_minus, anno, anchor, upstream=1000, downstream=1000, window_size = 1,
+                            collapse_fun = rowMeans,
                             negate_neg_strand_values=FALSE) {
+  print('1')
   if( class(anno) == 'GRanges' ) {
     regions <- anno
   } else if ( is.character(class(anno)) ) {
     tryCatch(
-      regions <- RMetaTools::meta_regions(anno, anchor, upstream, downstream),
+      regions <- meta_regions(anno, anchor, upstream, downstream),
       error = function(c) {
         c$message <- paste0("Error while trying to create metagene regions from bed file: ", anno, '\n', c$message)
         stop(c)
@@ -273,8 +268,8 @@ metagene_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1
   }
 
   tryCatch(
-    mat <- RMetaTools::get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size,
-                                  collapse_fun, collapse_fun_args, negate_neg_strand_values),
+    mat <- get_matrix(bw_plus, bw_minus, regions, upstream, downstream, window_size,
+                                  collapse_fun, negate_neg_strand_values),
     error = function(c) {
       c$message <- paste0("Error while trying to create  metagene matrix.\n", c$message)
       stop(c)
@@ -283,7 +278,7 @@ metagene_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1
 
   tryCatch(
     {
-      mat <- RMetaTools::mat_to_tbl(mat)
+      mat <- mat_to_tbl(mat)
     },
     error = function(c) {
       c$message <- paste0("Error while converting raw metagene matrix to tbl.\n", c$message)

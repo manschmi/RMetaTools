@@ -5,7 +5,7 @@
 \title{Metagene Matrix}
 \usage{
 get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
-  window_size = 1, collapse_fun = rowMeans, collapse_fun_args = NULL,
+  window_size = 1, collapse_fun = rowMeans,
   negate_neg_strand_values = FALSE)
 }
 \arguments{
@@ -22,8 +22,6 @@ get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
 \item{window_size}{size for binning in bp (default=1, ie no binning)}
 
 \item{collapse_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
-
-\item{collapse_fun_args}{additional arguments passed to collapse_fun (default=NULL)}
 
 \item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
 }

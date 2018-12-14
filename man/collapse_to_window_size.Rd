@@ -4,7 +4,7 @@
 \alias{collapse_to_window_size}
 \title{Collapse Matrix To Windows}
 \usage{
-collapse_to_window_size(mat, collapse_fun = rowMeans, window_size = 10, ...)
+collapse_to_window_size(mat, collapse_fun = rowMeans, window_size = 10)
 }
 \arguments{
 \item{mat}{matrix}
@@ -12,8 +12,6 @@ collapse_to_window_size(mat, collapse_fun = rowMeans, window_size = 10, ...)
 \item{collapse_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
 
 \item{window_size}{size for binning in bp (default=10, ie average over 10nt)}
-
-\item{...}{additional arguments passed to collapse_fun}
 }
 \value{
 matrix with ncol(input matrix)/window_size columns
@@ -31,7 +29,7 @@ matc <- collapse_to_window_size(mat, rowMeans, 10)
 dim(matc)
 
 log2RowMeans <- function(mat, pseudocount=1){apply(mat,1,function(row) mean(log2(row+pseudocount)))}
-matc <- collapse_to_window_size(mat, log2RowMeans, 10, pseudocount = .1)
+matc <- collapse_to_window_size(mat, log2RowMeans, 10)
 dim(matc)
 
 }

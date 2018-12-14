@@ -4,8 +4,7 @@
 \alias{get_single_strand_matrix}
 \title{Single Strand Metagene Matrix}
 \usage{
-get_single_strand_matrix(bw, anno, upstream = 1000, downstream = 1000,
-  strand = "+")
+get_single_strand_matrix(bw, anno, upstream, downstream)
 }
 \arguments{
 \item{bw}{filename for bigwig file.}
@@ -15,8 +14,6 @@ get_single_strand_matrix(bw, anno, upstream = 1000, downstream = 1000,
 \item{upstream}{bp upstream of anchor (default=1000)}
 
 \item{downstream}{bp downstream of anchor (default=1000)}
-
-\item{strand}{strand of anno to use (default='+')}
 }
 \value{
 matrix with columns from most upstream to most downstream and rows are the individual regions from specified strand. rownames are set as name column from anno. colnames are set to relative position of each nt
@@ -31,7 +28,7 @@ Loads the bed file, extracts the position of the anchor point and creates ranges
 
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
 regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-mat <- get_single_strand_matrix(bw_plus, regions, 1000, 5000, '+')
+bw <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+mat <- get_single_strand_matrix(bw=bw, anno=regions, upstream=1000, downstream=5000)
 
 }
