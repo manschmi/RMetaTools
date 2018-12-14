@@ -166,7 +166,7 @@ collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 
 #' @examples
 #'
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 #' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 1)
@@ -207,7 +207,7 @@ get_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1000, 
 #' @examples
 #'
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 #' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)
@@ -262,7 +262,7 @@ metagene_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1
     regions <- anno
   } else if ( is.character(class(anno)) ) {
     tryCatch(
-      regions <- RMetaTools::meta_regions(anno, anchor, upstream, downstream, window_size),
+      regions <- RMetaTools::meta_regions(anno, anchor, upstream, downstream),
       error = function(c) {
         c$message <- paste0("Error while trying to create metagene regions from bed file: ", anno, '\n', c$message)
         stop(c)
@@ -311,7 +311,7 @@ metagene_matrix <- function(bw_plus, bw_minus, anno, upstream=1000, downstream=1
 #' @examples
 #'
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 #' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)
@@ -350,7 +350,7 @@ plot_htmp <- function(tbl, color_by='value', do_interpolate=FALSE){
 #' @examples
 #'
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 #' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)
@@ -380,7 +380,7 @@ meta_average <- function(tbl){
 #' @examples
 #'
 #' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 #' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 #' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 #' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)

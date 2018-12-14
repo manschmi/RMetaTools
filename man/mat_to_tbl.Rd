@@ -21,7 +21,7 @@ Converts metagene matrix to tbl using rownames and colnames information to assig
 \examples{
 
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-regions <- meta_regions(bedfile, 'TSS', 1000, 5000, 50)
+regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)
