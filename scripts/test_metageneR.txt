@@ -1,0 +1,6 @@
+bedfile="/Users/au220280/ms_tools/RMetaTools/inst/extdata/Chen_PROMPT_TSSs_liftedTohg38.bed"
+bw_path="/Users/au220280/ms_tools/RMetaTools/inst/extdata/"
+bw_plus_regex="_plus_hg38.bw"
+bw_minus_regex="_minus_hg38.bw"
+
+Rscript metageneR.R -region=1000:TSS:4000/250 -bwpath=${bw_path} -plus_bw_regex=${bw_plus_regex} -minus_bw_regex=${bw_minus_regex} -bed=${bedfile} -out=test.RData
