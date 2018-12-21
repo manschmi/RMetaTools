@@ -252,7 +252,6 @@ mat_to_tbl <- function(mat) {
 metagene_matrix <- function(bw_plus, bw_minus, anno, anchor, upstream=1000, downstream=1000, window_size = 1,
                             collapse_fun = rowMeans,
                             negate_neg_strand_values=FALSE) {
-  print('1')
   if( class(anno) == 'GRanges' ) {
     regions <- anno
   } else if ( is.character(class(anno)) ) {
