@@ -45,6 +45,7 @@ meta_regions <- function(bed,
 }
 
 
+
 #' Single Strand Metagene Matrix
 #'
 #' Creates metagene matrix for single bigwig file.
@@ -53,6 +54,7 @@ meta_regions <- function(bed,
 #' @param anno GRanges object of regions to query.
 #' @param upstream bp upstream of anchor (default=1000)
 #' @param downstream bp downstream of anchor (default=1000)
+#' @param entire_region use entire region (default=FALSE)
 #'
 #' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
 #'
@@ -66,11 +68,18 @@ meta_regions <- function(bed,
 #' mat <- get_single_strand_matrix(bw=bw, anno=regions, upstream=1000, downstream=5000)
 #'
 #' @export
-get_single_strand_matrix <- function(bw, anno, upstream, downstream) {
+get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000, entire_region=FALSE) {
 
   ##handling specific strand and order to ensure correct output naming
   seqlevels(anno) <- sort(seqlevels(anno))
   anno <- sort(anno)
+
+  ##handling uneven region sizes without defined window size
+  if(entire_region) {
+    message('using scale region mode, upstream and downstream arguments are ignored')
+    upstream <- 0
+    downstream <- max(width(anno))
+  }
 
   ##ensure to query only chrs present in bigwig,
   ## ie otherwise import(bw, ...) will return in error
@@ -98,9 +107,9 @@ get_single_strand_matrix <- function(bw, anno, upstream, downstream) {
 
 
 
-#' Collapse Matrix To Windows
+#' Collapse Matrix To Windows by Window Size
 #'
-#' Averages Matrix Columns into Windows using an Averaging Function
+#' Averages Matrix Columns into Windows using an Averaging Function amd a defined window size
 #'
 #' @param mat matrix
 #' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
@@ -113,7 +122,7 @@ get_single_strand_matrix <- function(bw, anno, upstream, downstream) {
 #' @examples
 #'
 #' mat <- matrix(1:1000, nrow=10, ncol=100)
-#' matc <- collapse_to_window_size(mat, rowMeans, 10)
+#' matc <- collapse_to_n_windows(anno, mat, mean, 10)
 #' dim(matc)
 #'
 #' log2RowMeans <- function(mat, pseudocount=1){apply(mat,1,function(row) mean(log2(row+pseudocount)))}
@@ -138,6 +147,48 @@ collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 
 
   mat
 }
+
+
+#' Collapse Matrix To Windows by Window Number
+#'
+#' Averages Matrix Columns into Windows using an Averaging Function amd a defined number of windows
+#'
+#' @param mat matrix
+#' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
+#' @param n_windows number of windows (default=10, ie collapse to 10 values eah)
+#'
+#' @details for a matrix with ncol=100 or 50 and n_windows=10, will return a matrix with ncol=10 in both cases. collapse_fun is a function that functions as ie rowMeans (the default) or rowSums.
+#'
+#' @return matrix with n_windows columns
+#'
+#' @examples
+#'
+#' bedfile <- system.file("extdata", "snRNA_MS31_hg38.bed", package = "RMetaTools")
+#' regions <- rtracklayer::import(bedfile)
+#' mat <- get_single_strand_matrix(bw=bw, anno=regions, upstream=NULL, downstream=NULL)
+#' dim(mat)
+#' matc <- collapse_to_n_windows(anno, mat, mean, 10)
+#' dim(matc)
+#'
+#' @export
+collapse_to_n_windows <- function(anno, mat, collapse_fun = mean, n_windows = 10) {
+
+  matc <- t(sapply(seq_along(anno), function(i) {
+      windows <- as.integer(seq(1,width(anno[i])+1,length.out = n_windows+1))
+
+      window_starts <- windows[1:length(windows)-1]
+      window_ends <- windows[2:length(windows)]-1
+      wins <- data.frame(s=window_starts, e=window_ends)
+
+      apply(wins, 1, function(win) collapse_fun(mat[i,win['s']:win['e']]))
+    }))
+
+  colnames(matc) <- 1:n_windows
+  rownames(matc) <- rownames(mat)
+
+  matc
+}
+
 
 
 #' Metagene Matrix
