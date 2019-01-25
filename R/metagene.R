@@ -191,7 +191,7 @@ collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 
 collapse_to_n_windows <- function(anno, mat, collapse_fun = mean, n_windows = 10) {
 
   matc <- t(sapply(seq_along(anno), function(i) {
-      windows <- as.integer(seq(1,width(anno[i])+1,length.out = n_windows+1))
+      windows <- as.integer(seq(1,ncol(mat)+1,length.out = n_windows+1))
 
       window_starts <- windows[1:length(windows)-1]
       window_ends <- windows[2:length(windows)]-1
@@ -362,8 +362,12 @@ metagene_matrix <- function(bw_plus, bw_minus, anno,
                             collapse_avg_fun = rowMeans,
                             negate_neg_strand_values=FALSE) {
 
-  meta_args <- c(anchor, upstream, downstream, collapse_to_win_size, collapse_to_n_wins)
-  names(meta_args) <- c('anchor', 'upstream', 'downstream', 'collapse_to_win_size', 'collapse_to_n_wins')
+  meta_args <- c(anchor, upstream, downstream)
+  names(meta_args) <- c('anchor', 'upstream', 'downstream')
+
+  if (collapse_to_win_size) {meta_args['collapse_to_win_size'] = collapse_to_win_size}
+  if (collapse_to_n_wins) {meta_args['collapse_to_n_wins'] = collapse_to_n_wins}
+
 
   tryCatch(
       regions <- meta_regions(anno, anchor, upstream, downstream),
