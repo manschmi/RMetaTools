@@ -51,7 +51,8 @@ library(httr)
 set_config( config( ssl_verifypeer = 0L ) )
 options(unzip = "internal")
 
-install_github('manschmi/RMetaTools')
+install_github('manschmi/RMetaTools') #full install including dependencies
+install_github('manschmi/RMetaTools', upgrade=FALSE) #only RMetaTools but no dependencies are updated
 ```
 
 
@@ -162,6 +163,24 @@ plot_profile(log2_meta_tbl_avgs)
 
 
 # Recipes
+
+## using Rscript metageneR.R
+
+Instead of running the metagene matrix generation interactively, it can alos be run using *Rscript*. The easiest is to get this from github at \link{https://raw.githubusercontent.com/manschmi/RMetaTools/master/scripts/metageneR.R}.
+
+or on genome.au.dk in the Terminal:
+```{bash}
+wget https://raw.githubusercontent.com/manschmi/RMetaTools/master/scripts/metageneR.R
+```
+
+which will add metageneR.R to the current location.
+
+in a Terminal you can now do:
+```{bash}
+Rscript metageneR.R -h
+```
+
+
 
 ## Recipe: order heatmap rows 
 #### using sum of values per row

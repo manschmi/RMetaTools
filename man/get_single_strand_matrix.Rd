@@ -4,7 +4,7 @@
 \alias{get_single_strand_matrix}
 \title{Single Strand Metagene Matrix}
 \usage{
-get_single_strand_matrix(bw, anno, upstream, downstream)
+get_single_strand_matrix(bw, anno, upstream = 1000, downstream = 1000)
 }
 \arguments{
 \item{bw}{filename for bigwig file.}
@@ -22,7 +22,7 @@ matrix with columns from most upstream to most downstream and rows are the indiv
 Creates metagene matrix for single bigwig file.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
+Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. I upstream and downstream are both NULL, collects signal within region specified in anno.
 }
 \examples{
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/metagene.R
 \name{collapse_to_window_size}
 \alias{collapse_to_window_size}
-\title{Collapse Matrix To Windows}
+\title{Collapse Matrix To Windows by Window Size}
 \usage{
 collapse_to_window_size(mat, collapse_fun = rowMeans, window_size = 10)
 }
@@ -17,7 +17,7 @@ collapse_to_window_size(mat, collapse_fun = rowMeans, window_size = 10)
 matrix with ncol(input matrix)/window_size columns
 }
 \description{
-Averages Matrix Columns into Windows using an Averaging Function
+Averages Matrix Columns into Windows using an Averaging Function amd a defined window size
 }
 \details{
 for a matrix with ncol=100 and window_size=10, will return a matrix with ncol=10. collapse_fun is a function that functions as ie rowMeans (the default) or rowSums.
@@ -25,7 +25,7 @@ for a matrix with ncol=100 and window_size=10, will return a matrix with ncol=10
 \examples{
 
 mat <- matrix(1:1000, nrow=10, ncol=100)
-matc <- collapse_to_window_size(mat, rowMeans, 10)
+matc <- collapse_to_n_windows(anno, mat, mean, 10)
 dim(matc)
 
 log2RowMeans <- function(mat, pseudocount=1){apply(mat,1,function(row) mean(log2(row+pseudocount)))}

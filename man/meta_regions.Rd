@@ -9,7 +9,7 @@ meta_regions(bed, anchor = "TSS", upstream = 1000, downstream = 1000)
 \arguments{
 \item{bed}{filename for bed file.}
 
-\item{anchor}{anchor point TSS, TES or center (default='TSS')}
+\item{anchor}{anchor point TSS, TES, center or NULL (default='TSS')}
 
 \item{upstream}{bp upstream of anchor (default=1000)}
 
@@ -22,7 +22,7 @@ GRanges with regions.
 Creates regions for metagene analysis.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream.
+Loads the bed file. If anchor is NULL, returns region from TSS-upstream to TES+downstream. If anchor, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream of the anchor point.
 }
 \examples{
 

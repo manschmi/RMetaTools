@@ -5,8 +5,8 @@
 \title{Metagene Matrix}
 \usage{
 get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
-  window_size = 1, collapse_fun = rowMeans,
-  negate_neg_strand_values = FALSE)
+  collapse_to_win_size = NULL, collapse_to_n_wins = NULL,
+  collapse_avg_fun = rowMeans, negate_neg_strand_values = FALSE)
 }
 \arguments{
 \item{bw_plus}{filename for plus strand bigwig file.}
@@ -19,9 +19,11 @@ get_matrix(bw_plus, bw_minus, anno, upstream = 1000, downstream = 1000,
 
 \item{downstream}{bp downstream of anchor (default=1000)}
 
-\item{window_size}{size for binning in bp (default=1, ie no binning)}
+\item{collapse_to_win_size}{size for binning in bp (default=1, ie no binning)}
 
-\item{collapse_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
+\item{collapse_to_n_wins}{number of bins to collapse to (default=NULL, ie no binning)}
+
+\item{collapse_avg_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
 
 \item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
 }
@@ -32,7 +34,12 @@ matrix with columns from most upstream to most downstream and rows are the indiv
 Creates metagene matrix for both strands using 1 or 2 bigwig files.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream using collapse_fun average over window_size regions. See \code{\link{collapse_to_window_size}} for more info about averaging over window size. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
+Loads the bed file. Anchored mode requires a anchor, upstream and downstream, extracts the position of the anchor point and
+  creates ranges from x bp upstream to x bp downstream. I anchor, upstream and downstream are NULL, collects values over specified entire regions.
+  If collapse_to_win_size is set to a integer > 0, uses collapse_avg_fun (rowMeans, rowSums or similar) to overage signals within this range See \code{\link{collapse_to_window_size}} for more info about averaging over window size.
+  If collapse_to_n_wins is not NULL, ups: this requires collapse_avg_fun to be set to mean, sum or similar (ie instead of the default rowMeans) to overage signals into x equally sized bins. Only used if collapse_to_win_size is not > 1. See \code{\link{collapse_to_n_windows}} for more info about averaging into defined number of windows.
+  Negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all
+  negative values as used by some labs.
 }
 \examples{
 
@@ -41,9 +48,15 @@ regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
 mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 1)
+dim(mat)
+mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 50)
+dim(mat)
+mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, collapse_to_n_wins=5, collapse_avg_fun=mean)
+dim(mat)
 
 #if bigwigs are not stranded, ie from ChIP experiment both plus and minus are the same file
 bw <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_hg38.bw", package = "RMetaTools")
 mat <- get_matrix(bw, bw, regions, 1000, 5000, 50)
+
 
 }

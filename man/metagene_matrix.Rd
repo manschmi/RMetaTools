@@ -4,8 +4,9 @@
 \alias{metagene_matrix}
 \title{Metagene Matrix}
 \usage{
-metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream = 1000,
-  downstream = 1000, window_size = 1, collapse_fun = rowMeans,
+metagene_matrix(bw_plus, bw_minus, anno, anchor = "TSS", upstream = 1000,
+  downstream = 1000, collapse_to_win_size = NULL,
+  collapse_to_n_wins = NULL, collapse_avg_fun = rowMeans,
   negate_neg_strand_values = FALSE)
 }
 \arguments{
@@ -15,15 +16,17 @@ metagene_matrix(bw_plus, bw_minus, anno, anchor, upstream = 1000,
 
 \item{anno}{Bed filename for annotations to use OR a GRanges object (see Details).}
 
-\item{anchor}{'TSS', 'TES' or 'center.'}
+\item{anchor}{'TSS', 'TES', 'center' or NULL (default='TSS')}
 
 \item{upstream}{bp upstream of anchor (default=1000)}
 
 \item{downstream}{bp downstream of anchor (default=1000)}
 
-\item{window_size}{size for binning in bp (default=1, ie no binning)}
+\item{collapse_to_win_size}{size for binning in bp (default=1, ie no binning)}
 
-\item{collapse_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
+\item{collapse_to_n_wins}{number of bins to collapse to (default=NULL, ie no binning)}
+
+\item{collapse_avg_fun}{function for averaging values inside windows (Default = rowMeans, see Details).}
 
 \item{negate_neg_strand_values}{negate values from minus strand bigwig (default=FALSE).}
 }
@@ -34,7 +37,7 @@ Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (pos
 Computes a metagene matrix from scratch.
 }
 \details{
-Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
+Loads the bed file. If anchor is given, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. If anchor is NULL, collects signal in specified region from TSS-upstream to TES+downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
 When using a GRanges object for anno, this assumes the bigwigs will be queries from start to end! All ranges must be exactly same size!
 }
 \examples{
@@ -45,5 +48,16 @@ bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", 
 anno=bedfile;anchor='center';upstream=1000;downstream=1000;window_size=10
 collapse_fun = rowMeans;negate_neg_strand_values=FALSE
 metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, collapse_to_n_wins=5, collapse_avg_fun=mean)
+bedfile <- system.file("extdata", "snRNA_MS31_hg38.bed", package = "RMetaTools")
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor=NULL, 10, 10, collapse_to_n_wins=5, collapse_avg_fun=mean)
+
+# for pre-loaded regions (useful for ie modifying regions by hand)
+# this most useful
+regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
+metamat <- metagene_matrix(bw_plus, bw_minus, regions, anchor=NULL, upstream=0, downstream=0, collapse_to_n_wins=5, collapse_avg_fun=mean)
+metamat <- metagene_matrix(bw_plus, bw_minus, regions, anchor='TSS', upstream=100, downstream=100, collapse_to_win_size=50, collapse_avg_fun=rowMeans)
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor='TSS', upstream=100, downstream=100, collapse_to_win_size=50, collapse_avg_fun=rowMeans)
 
 }
