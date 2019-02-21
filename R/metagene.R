@@ -365,8 +365,8 @@ metagene_matrix <- function(bw_plus, bw_minus, anno,
   meta_args <- c(anchor, upstream, downstream)
   names(meta_args) <- c('anchor', 'upstream', 'downstream')
 
-  if (collapse_to_win_size) {meta_args['collapse_to_win_size'] = collapse_to_win_size}
-  if (collapse_to_n_wins) {meta_args['collapse_to_n_wins'] = collapse_to_n_wins}
+  if (!is.null(collapse_to_win_size)) {meta_args['collapse_to_win_size'] = collapse_to_win_size}
+  if (!is.null(collapse_to_n_wins)) {meta_args['collapse_to_n_wins'] = collapse_to_n_wins}
 
 
   tryCatch(
