@@ -69,7 +69,7 @@ install_github('manschmi/RMetaTools', upgrade=FALSE) #only RMetaTools but no dep
 
 
 check by trying to load RMetaTools
-```{r}
+```{r, eval=T}
 library('RMetaTools')
 ```
 
@@ -83,7 +83,7 @@ Now you should be all set to try and runt he examples below and/or test with you
 This should work with any deeptools matrix. From deeptools v2 to v3 some things changed so there are 2 versions.
 
 
-```{r}
+```{r, eval=T}
 ?load_deeptoolsmatrix3
 ```
 
