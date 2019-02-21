@@ -21,11 +21,14 @@ uses t.test to get mean ('estimate'), confidence interval etc for each position 
 \examples{
 
 bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 1000, 50)
-tidy_meta <- mat_to_tbl(mat)
-tidy_avgs <- meta_average(tidy_meta)
+anno=bedfile;anchor='center';upstream=1000;downstream=1000;window_size=10
+collapse_fun = rowMeans;negate_neg_strand_values=FALSE
+metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+tidy_avgs <- meta_average(metamat)
+
+#alt:
+tidy_log2_avgs <- meta_average(mutate(metamat, value = log2(value+1)))
 
 }

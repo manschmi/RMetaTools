@@ -56,6 +56,9 @@ metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor=NULL, 10, 10, coll
 # for pre-loaded regions (useful for ie modifying regions by hand)
 # this most useful
 regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
+start(regions) <- start(regions) + 1000
+end(regions) <- end(regions) - 1000
+regions <- regions[width(regions)>0,]
 metamat <- metagene_matrix(bw_plus, bw_minus, regions, anchor=NULL, upstream=0, downstream=0, collapse_to_n_wins=5, collapse_avg_fun=mean)
 metamat <- metagene_matrix(bw_plus, bw_minus, regions, anchor='TSS', upstream=100, downstream=100, collapse_to_win_size=50, collapse_avg_fun=rowMeans)
 metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor='TSS', upstream=100, downstream=100, collapse_to_win_size=50, collapse_avg_fun=rowMeans)
