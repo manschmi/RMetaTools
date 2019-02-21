@@ -22,9 +22,21 @@ knitr::opts_chunk$set(
 
 # Install and Load Package
 
+usually this should work:
+```{r, eval=FALSE}
+library(devtools)
+install_github('manschmi/RMetaTools') #full install including dependencies
+```
+
+and then this should not throw an error
+```{r}
+library(RMetaTools)
+```
+
+
 #### INSTALL on ie genome.dk
 
-Handling R packages can be tricky, ie installing devtools which will be needed failed for me so better stick to 'conda' for handling such annoyancies. Ups: you will have to install conda as described in the genome.au.dk helppages.
+Handling R packages at genome.dk can be tricky, ie installing devtools which will be needed failed for me so better stick to 'conda' for handling such annoyancies. Ups: you will have to install conda as described in the genome.au.dk helppages.
 
 Run this in the Terminal, front-end: (ups can take a long time each step...). Just say *yes* to everything when asked.
 ```{bash, eval=F}
@@ -56,7 +68,7 @@ install_github('manschmi/RMetaTools', upgrade=FALSE) #only RMetaTools but no dep
 ```
 
 
-load RMetaTools
+check by trying to load RMetaTools
 ```{r}
 library('RMetaTools')
 ```
@@ -65,8 +77,111 @@ Hopefully this does not throw and error.
 Now you should be all set to try and runt he examples below and/or test with your own data!
 
 
-# Metagene Analysis with RMetaTools
+# Loading and visualizing deeptools matrices
 
+
+This should work with any deeptools matrix. From deeptools v2 to v3 some things changed so there are 2 versions.
+
+
+```{r}
+?load_deeptoolsmatrix3
+```
+
+#### for deeptools v2
+
+probably never used anymore
+```{r}
+fname <- system.file("extdata", "matrix.gz", package = "RMetaTools")
+df <- load_deeptoolsmatrix(fname)
+
+df
+```
+
+#### for deeptools v3
+```{r}
+fname <- system.file("extdata", "deeptools3_matrix.gz", package = "RMetaTools")
+
+df <- load_deeptoolsmatrix3(fname)
+```
+
+
+#### simple metagene plot therefrom
+
+ups: this example has way too many samples --> simplify before plotting
+```{r}
+mini_df <- df %>%
+  filter(grepl('^EGFP', sample_name) | grepl('^RRP40', sample_name)) %>%
+  mutate(sample_name = sub('_hg38.*', '', sample_name))
+```
+
+```{r}
+mini_df %>%
+  group_by(sample_name, rel_pos) %>%
+  summarize(mean_log2_value = mean(log2(value+1))) %>%
+  ggplot(., aes(x=rel_pos, y=mean_log2_value, color=sample_name)) +
+  geom_line() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+
+
+##more funky metagene profile with confidence interval
+needs a little extra package for tidy t-testing (should be loaded but just to make sure)
+
+```{r}
+library('broom')
+```
+
+
+```{r}
+(meta_values <- mini_df %>%
+  group_by(sample_name, rel_pos) %>%
+  do(tidy(t.test(log2(.$value+1)))))
+```
+
+```{r}
+meta_values %>%
+  ggplot(.) +
+  geom_line(aes(x=rel_pos, y=estimate, color=sample_name)) +
+  geom_ribbon(aes(x=rel_pos, ymin=conf.low, ymax=conf.high, fill=sample_name, stroke=NA), alpha=.2) +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+
+#### a heatmap
+
+```{r}
+mini_df %>%
+  ggplot(., aes(x=rel_pos, y=id, fill=log2(value+1))) +
+  geom_tile() +
+  facet_grid(.~sample_name) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+#### a heatmap sorted by signal
+
+```{r}
+ids_sum_sorted <- mini_df %>%
+  group_by(id) %>%
+  summarize(total_value = sum(value)) %>%
+  arrange(total_value) %$%
+  id
+```
+
+```{r}
+mini_df %>%
+  mutate(id = factor(id, levels=ids_sum_sorted)) %>%
+  ggplot(., aes(x=rel_pos, y=id, fill=log2(value+1))) +
+  geom_tile() +
+  facet_grid(.~sample_name) +
+  theme(axis.text.y = element_blank()) +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+
+
+# Metagene Analysis Directly with RMetaTools
 
 
 #### Load metagene values
@@ -169,14 +284,14 @@ plot_profile(log2_meta_tbl_avgs)
 Instead of running the metagene matrix generation interactively, it can alos be run using *Rscript*. The easiest is to get this from github at \link{https://raw.githubusercontent.com/manschmi/RMetaTools/master/scripts/metageneR.R}.
 
 or on genome.au.dk in the Terminal:
-```{bash}
+```{bash, eval=FALSE}
 wget https://raw.githubusercontent.com/manschmi/RMetaTools/master/scripts/metageneR.R
 ```
 
 which will add metageneR.R to the current location.
 
 in a Terminal you can now do:
-```{bash}
+```{bash, eval=FALSE}
 Rscript metageneR.R -h
 ```
 
@@ -559,7 +674,7 @@ window_size = 50
 ```
 
 ```{r}
-regions <- meta_regions(bedfile, 'TSS', upstream, downstream, window_size)
+regions <- meta_regions(bedfile, 'TSS', upstream, downstream)
 
 regions
 ```
