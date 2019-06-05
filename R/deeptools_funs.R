@@ -135,7 +135,7 @@ load_deeptoolsmatrix3 <- function(fname, na.omit=TRUE, na.fill=0, as.matrix=FALS
       name <- msamples[i]
       left <- sample_bounds[i] + 7
       right <- sample_bounds[i+1] + 6
-      name_vec <- c(name_vec, paste0(name, xlabels))
+      name_vec <- c(name_vec, paste0(name, '@', as.character(xlabels[[1]])))
     }
     colnames(values) <- c(bednames, name_vec)
     return(values)
