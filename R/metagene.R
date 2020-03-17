@@ -302,8 +302,8 @@ mat_to_tbl <- function(mat) {
   nm <- mat %>%
     as.data.frame %>%
     tibble::rownames_to_column(var = 'name') %>%
-    tidyr::gather(., relpos, value, -name) %>%
-    mutate(relpos = as.numeric(relpos)) %>%
+    tidyr::gather(., rel_pos, value, -name) %>%
+    mutate(rel_pos = as.numeric(rel_pos)) %>%
     tbl_df
 
   nm
@@ -439,7 +439,7 @@ metagene_matrix <- function(bw_plus, bw_minus, anno,
 #'
 #' @export
 plot_htmp <- function(tbl, color_by='value', do_interpolate=FALSE){
-  ggplot(tbl, aes_string(x='relpos', y='name', fill=color_by)) +
+  ggplot(tbl, aes_string(x='rel_pos', y='name', fill=color_by)) +
     geom_raster(interpolate=do_interpolate) +
     scale_fill_gradient(low='white', high='black')+
     scale_x_continuous(expand=c(0,0)) +
@@ -509,8 +509,8 @@ meta_average <- function(tbl){
 #' @export
 plot_profile <- function(meta_tbl, color_by=NULL){
   ggplot(meta_tbl) +
-    geom_ribbon(aes_string(x='relpos', ymin='conf.low', ymax='conf.high', fill=color_by), alpha=.2) +
-    geom_line(aes_string(x='relpos', y='estimate', color=color_by)) +
+    geom_ribbon(aes_string(x='rel_pos', ymin='conf.low', ymax='conf.high', fill=color_by), alpha=.2) +
+    geom_line(aes_string(x='rel_pos', y='estimate', color=color_by)) +
     scale_x_continuous(expand=c(0,0)) +
     scale_y_continuous(expand=c(0,0)) +
     theme_bw() +
