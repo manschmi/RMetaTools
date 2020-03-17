@@ -5,7 +5,7 @@
 \title{load_deeptoolsmatrix3}
 \usage{
 load_deeptoolsmatrix3(fname, na.omit = TRUE, na.fill = 0,
-  as.matrix = FALSE)
+  as.matrix = FALSE, as.S3 = FALSE)
 }
 \arguments{
 \item{fname}{the file to load.}
@@ -15,6 +15,8 @@ load_deeptoolsmatrix3(fname, na.omit = TRUE, na.fill = 0,
 \item{na.fill}{Fills NAs with this value zero. Default is 0.}
 
 \item{as.matrix}{Return matrix as matrix (default is FALSE, ie returns tidy data.frame instead)}
+
+\item{as.S3}{Return S3 class metagene object, see details for more info}
 }
 \value{
 An object of class \code{deeptools_matrix} with provided means and covariances
@@ -24,7 +26,14 @@ An object of class \code{deeptools_matrix} with provided means and covariances
 Loads a deeptools v3 matrix file.
 }
 \details{
-Loads a gzipped deeptools matrix file and collects this in a \code{tidy} data.frame. If as.matrix is true, the header information is added as attribute.
+Loads a gzipped deeptools matrix file and collects this in a
+  \code{tidy} data.frame. If as.matrix is true, the header information is
+  added as attribute.
+  as.S3 returns a metagene object, with slots: $header, $regions, $samples,
+  $groups and $matrices. Where $header contains the header information as a
+  named vector. Matrices is a list of matrices where each matrix is specific
+  to 1 sample and 1 group. $samples are the samplenames for each matrix.
+  $groups are the groups for each matrix.
 }
 \examples{
 
@@ -35,5 +44,7 @@ Loads a gzipped deeptools matrix file and collects this in a \code{tidy} data.fr
  head(df_withNA)
  df_withNAas0 <- load_deeptoolsmatrix3(fname, na.omit=FALSE, na.fill=0)
  head(df_withNAas0)
+ s3obj <- load_deeptoolsmatrix3(fname, na.omit=FALSE, na.fill=0, as.S3=TRUE)
+ head(s3obj$regions)
 
 }
