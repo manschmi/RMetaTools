@@ -29,7 +29,7 @@ install_github('manschmi/RMetaTools') #full install including dependencies
 ```
 
 and then this should not throw an error
-```{r}
+```{r, eval=T}
 library(RMetaTools)
 ```
 
@@ -304,7 +304,7 @@ To order heatmap rows in ggplot2 requires a bit of work.
 ie to order according to the sum in each row, we first compute and order '*by-hand*'.
 ```{r}
 value_order <- log2_meta_tbl %>%
-  filter(relpos == 0 | relpos==50) %>% #optional: select ie first 2 50bp intervals from TSS
+  filter(rel_pos == 0 | rel_pos==50) %>% #optional: select ie first 2 50bp intervals from TSS
   group_by(name) %>%
   summarize(total_value = sum(value)) %>%
   arrange(total_value) %$%
@@ -611,9 +611,9 @@ using a t.test would require roughly normal distributed data. This is often not 
 
 ```{r}
 log2_both_meta %>%
-  filter(relpos > -100 & relpos < 200) %>%
-  mutate(relpos = factor(relpos)) %>%
-  ggplot(., aes(x=value, color=relpos)) +
+  filter(rel_pos > -100 & rel_pos < 200) %>%
+  mutate(rel_pos = factor(rel_pos)) %>%
+  ggplot(., aes(x=value, color=rel_pos)) +
   geom_density() +
   facet_grid(.~condition) +
   theme_minimal()
@@ -629,7 +629,7 @@ suppressWarnings(library(broom))
 ```{r}
 (LFC_wilcox_p <- log2_both_meta %>%
   spread(condition, value) %>%
-  group_by(relpos) %>%
+  group_by(rel_pos) %>%
   do(tidy(wilcox.test(.$siCPSF73, .$ctrl))))
 ```
 
@@ -645,7 +645,7 @@ plot the adjusted p values, ie visually better as -log10(p.value)
 
 ```{r}
 ggplot(LFC_wilcox_p,
-       aes(x=relpos, y=-log10(padj))) +
+       aes(x=rel_pos, y=-log10(padj))) +
   geom_line()
 ```
 
