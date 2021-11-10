@@ -28,6 +28,9 @@ library(devtools)
 install_github('manschmi/RMetaTools') #full install including dependencies
 ```
 
+Note, if the above fails, you can also try to load RMetatools as Project in R and the run 'Build and Install'.
+Finally, if both fail you can try to source relevant .R files. You will then have manually load dependencies (these should be pretty common R packages tidyverse, broom, magrittr, rtracklayer and jsonlite).
+
 and then this should not throw an error
 ```{r, eval=T}
 library(RMetaTools)
@@ -89,9 +92,16 @@ This should work with any deeptools matrix. From deeptools v2 to v3 some things,
 
 
 #### for deeptools v3
+
+Load an example matrix from RMetatools (if package installed, otherwise you can find this file in subfolder RMetatools/inst/extdata).
+For your own data simply specify full path and filename of your matrix.
 ```{r}
 fname <- system.file("extdata", "deeptools3_matrix.gz", package = "RMetaTools")
 
+fname
+```
+
+```{r}
 m <- load_deeptoolsmatrix3_new(fname)
 ```
 
@@ -109,7 +119,7 @@ unique(m$groups)
 ```
 
 
-To modify this object you can directly modify samples or groups and regions. Note: groups and region names must be consistent, as shown below.
+To modify the relevant names in the object you can directly modify samples or groups and regions. Note: groups and region names must be consistent, as shown below.
 
 ### change sample names
 
@@ -132,7 +142,7 @@ names(m$regions) <- sub('genes', 'Gene', names(m$regions))
 ```
 
 
-#### aggregate for metagene plots
+## aggregate for metagene plots
 
 Easiest is to create metagene profile plots using the metagene_aggregate function in the tool.
 
@@ -180,7 +190,7 @@ ggplot(., aes(x=rel_pos, y=mean, color=siRNA, linetype=rep)) +
 --> much easier to appreciate that both Z8 and Z1 have higher signal close to 0.
 
 
-#### a heatmap
+## heatmaps
 
 heatmap display in R is somewhat "heavy". In most cases its probably best to use deeptools plotHeatmap, perhaps modify the input matrix before using computeMatrixOperations from deeptools or the script computeMatrixOperationsMS.py from Manfreds Software folder.
 
