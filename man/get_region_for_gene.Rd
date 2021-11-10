@@ -4,8 +4,14 @@
 \alias{get_region_for_gene}
 \title{getRegionForGene}
 \usage{
-get_region_for_gene(anno, gene_id = "", gene_name = "", anchor = "gene",
-  left_offset = 0, right_offset = 0)
+get_region_for_gene(
+  anno,
+  gene_id = "",
+  gene_name = "",
+  anchor = "gene",
+  left_offset = 0,
+  right_offset = 0
+)
 }
 \arguments{
 \item{anno}{a data.frame holding the annotations}

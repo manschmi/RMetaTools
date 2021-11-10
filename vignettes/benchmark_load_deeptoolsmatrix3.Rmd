@@ -1,0 +1,62 @@
+---
+title: 'Bnechmarking load deeptoolsmatrix3'
+author: "Manfred Schmid"
+output: 
+  pdf_document:
+    toc: true 
+    toc_depth: 3
+    fig_caption: true
+---
+
+`r format(Sys.time(), "%d %B, %Y; %R")`
+
+## Setup
+
+```{r setup, echo=TRUE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, 
+                      fig.path=paste0('Figures_/'), 
+                      dev='pdf', 
+                      echo=TRUE, warning=FALSE, message=FALSE, 
+                      error=TRUE)
+```
+
+```{r load packages, echo=T, warning=F, message=F}
+suppressWarnings(library('tidyverse'))
+suppressWarnings(library('magrittr'))
+suppressWarnings(library('knitr'))
+suppressWarnings(library('RMetaTools'))
+suppressWarnings(library(microbenchmark))
+```
+
+
+```{r}
+fname <- system.file("extdata", "deeptools3_matrix.gz", package = "RMetaTools")
+```
+
+
+
+#### load as tidy df
+
+```{r}
+microbenchmark({df <- load_deeptoolsmatrix3(fname)}, times = 10)
+```
+
+
+#### load as matrix
+
+```{r}
+microbenchmark({df <- load_deeptoolsmatrix3(fname, as.matrix=T)}, times = 10)
+```
+
+
+#### load as s3 struct
+
+```{r}
+microbenchmark({df <- load_deeptoolsmatrix3(fname, as.S3=T)}, times = 10)
+```
+
+
+--> matrix and S3 are faster than tidy version and matrix marginally faster than S3
+```{r}
+sessionInfo()
+```

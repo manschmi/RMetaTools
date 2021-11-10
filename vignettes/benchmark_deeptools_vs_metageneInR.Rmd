@@ -1,0 +1,109 @@
+---
+title: 'Benchmarking ways to create metagene data matrix'
+author: "Manfred Schmid"
+output: 
+  pdf_document:
+    toc: true 
+    toc_depth: 3
+    fig_caption: true
+---
+
+`r format(Sys.time(), "%d %B, %Y; %R")`
+
+## Setup
+
+```{r setup, echo=TRUE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, 
+                      error=TRUE)
+```
+
+```{r load packages, echo=T, warning=F, message=F}
+suppressWarnings(library('tidyverse'))
+suppressWarnings(library('magrittr'))
+suppressWarnings(library('knitr'))
+
+suppressWarnings(library('rtracklayer'))
+suppressWarnings(library('microbenchmark'))
+```
+
+
+
+#### deeptools matrix creation time
+
+
+```{bash, eval=FALSE}
+conda activate deeptools3
+bedfile="inst/extdata/Chen_PROMPT_TSSs_liftedTohg38.bed"
+plus_bw="inst/extdata/GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw"
+minus_bw="inst/extdata/GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw"
+
+awk '$6=="+"' $bedfile > ${bedfile/.bed/_plus.bed}
+awk '$6=="-"' $bedfile > ${bedfile/.bed/_minus.bed}
+
+time python ~/ms_tools/MS_Metagene_Tools/computeMatrixStranded.py reference-point -Sp $plus_bw -Sm $minus_bw -Rp ${bedfile/.bed/_plus.bed} -Rm ${bedfile/.bed/_plus.bed} -b 1000 -a 1000 --binSize=50 -o test_deeptools_mat.gz --quiet
+
+#real    0m3.875s
+#user    0m3.648s
+#sys     0m0.216s
+
+#real    0m3.892s
+#user    0m3.663s
+#sys     0m0.214s
+```
+
+
+
+#### select regions and a bigwig file
+```{r}
+bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
+regions <- rtracklayer::import(bedfile)
+
+bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
+
+anchor = 'TSS'
+upstream = 1000
+downstream = 1000
+window_size = 50
+
+bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
+
+meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+
+metageneInR_fun <- function(){
+  meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+}
+```
+
+
+#### benchmark import function for the 3 return types
+
+```{r}
+microbenchmark(metageneInR_fun(), times = 10)
+```
+
+--> appears to take much less time, less than 1s !?
+
+
+```{r}
+(meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size))
+```
+
+
+
+
+```{r}
+metageneInR_fun2 <- function(){
+  m <- metagene_rel_anchor(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+}
+```
+
+```{r}
+microbenchmark(metageneInR_fun2(), times = 10)
+```
+
+
+
+```{r}
+sessionInfo()
+```

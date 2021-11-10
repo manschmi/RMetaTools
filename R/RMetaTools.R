@@ -8,6 +8,7 @@
 #'
 #' @docType package
 #' @name RMetaTools
-#' @import dplyr
+#' @import tidyverse
 #' @import magrittr
+#' @import broom
 NULL

@@ -3,7 +3,6 @@
 \docType{package}
 \name{RMetaTools}
 \alias{RMetaTools}
-\alias{RMetaTools-package}
 \title{RMetaTools: Compendium of Tools for Metagene Analysis.}
 \description{
 Uses and depends on python-based deeptools and C-based bwtool.

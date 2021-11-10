@@ -1,0 +1,79 @@
+---
+title: 'Benchmarking ways to import data from bigwigs'
+author: "Manfred Schmid"
+output: 
+  pdf_document:
+    toc: true 
+    toc_depth: 3
+    fig_caption: true
+---
+
+`r format(Sys.time(), "%d %B, %Y; %R")`
+
+## Setup
+
+```{r setup, echo=TRUE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, 
+                      error=TRUE)
+```
+
+```{r load packages, echo=T, warning=F, message=F}
+suppressWarnings(library('tidyverse'))
+suppressWarnings(library('magrittr'))
+suppressWarnings(library('rtracklayer'))
+suppressWarnings(library('microbenchmark'))
+```
+
+
+#### select regions and a bigwig file
+```{r}
+bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
+regions <- rtracklayer::import(bedfile)
+
+bw <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
+```
+
+
+#### benchmark import function for the 3 return types
+
+```{r}
+microbenchmark(
+  import(bw, which=regions, as = c("GRanges")),
+  import(bw, which=regions, as = c("RleList")),
+  import(bw, which=regions, as = c("NumericList")))
+```
+
+--> the import type almost does not matter, RleList is slightly slower than the others though.
+
+
+#### benchmark import+sum function for the 3 return types
+
+
+```{r}
+sums_via_GRanges <- function(bw, regions){
+sapply(seq_along(regions), function(i) {
+  hits <- import(bw, which=regions[i], as = c("GRanges"))
+  if(length(hits) > 0){
+    return(sum(hits$score*width(hits)))
+  }else{
+    return(0)
+  }
+})
+}
+
+microbenchmark(sums_via_GRanges(bw, regions), times=1)
+```
+
+```{r}
+sums_via_NumericList <- function(bw, regions){ 
+  sapply(import(bw, which=regions, as = c("NumericList")), sum)
+}
+
+microbenchmark(sums_via_NumericList(bw, regions), times=1)
+```
+
+
+
+```{r}
+sessionInfo()
+```

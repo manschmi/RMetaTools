@@ -4,8 +4,7 @@
 \alias{load_deeptoolsmatrix}
 \title{load_deeptoolsmatrix}
 \usage{
-load_deeptoolsmatrix(fname, na.omit = TRUE, na.fill = 0,
-  as.matrix = FALSE)
+load_deeptoolsmatrix(fname, na.omit = TRUE, na.fill = 0, as.matrix = FALSE)
 }
 \arguments{
 \item{na.omit}{Skip na values in the matrix.}

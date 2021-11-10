@@ -80,109 +80,202 @@ Now you should be all set to try and runt he examples below and/or test with you
 # Loading and visualizing deeptools matrices
 
 
-This should work with any deeptools matrix. From deeptools v2 to v3 some things changed so there are 2 versions.
+This should work with any deeptools matrix. From deeptools v2 to v3 some things, a version for deeptools 2 is posted at the very end of this document.
 
 
 ```{r, eval=T}
-?load_deeptoolsmatrix3
+?load_deeptoolsmatrix3_new
 ```
 
-#### for deeptools v2
-
-probably never used anymore
-```{r}
-fname <- system.file("extdata", "matrix.gz", package = "RMetaTools")
-df <- load_deeptoolsmatrix(fname)
-
-df
-```
 
 #### for deeptools v3
 ```{r}
 fname <- system.file("extdata", "deeptools3_matrix.gz", package = "RMetaTools")
 
-df <- load_deeptoolsmatrix3(fname)
+m <- load_deeptoolsmatrix3_new(fname)
 ```
+
+This loads an object that contains all info from the computeMatrix output file, with slots `R names(m)`.
+Subplot in the output from plotHeatmap are separated, that is, each samle and group are present several times if more than 1x group or samples, respectively, are present.
+
+We can easily get information about samples and groups (subgroups of regions).
+
+```{r}
+unique(m$samples)
+```
+
+```{r}
+unique(m$groups)
+```
+
+
+To modify this object you can directly modify samples or groups and regions. Note: groups and region names must be consistent, as shown below.
+
+### change sample names
+
+ie remove everything after _hg38 since this is irrelevant.
+This can be done like this:
+```{r}
+m$samples <- sub('_hg38.*', '', m$samples)
+```
+
+
+
+### change group and region names
+
+ie rename, not relevant in this example but name could be changed to somethin informative to be displayed in plots below. In any case if you change, the names must also be used as names of m$regions. But m$groups can have many more entries than m$regions. So this has to be done for each of those separate.
+
+ie
+```{r}
+m$groups <- sub('genes', 'Gene', m$groups)
+names(m$regions) <- sub('genes', 'Gene', names(m$regions))
+```
+
+
+#### aggregate for metagene plots
+
+Easiest is to create metagene profile plots using the metagene_aggregate function in the tool.
+
+You can get help on this function using the usual:
+```{r}
+?metagene_aggregate
+```
+
+a usual example would be to add pseudocount and log2 transform the data first and then run a t.test for each position(bin) like this:
+```{r}
+agg <- metagene_aggregate(m, aggregate_fun = 'ttest', transform_fun = function(x){log2(x+1)})
+```
+
+the output from this is pretty self-explanatory, but depends on aggregate fun. For the call above we get from the t.test the mean of log2(value+pseudocount) please lower and higher confidence interval.
+
+```{r}
+agg
+```
+
 
 
 #### simple metagene plot therefrom
 
-ups: this example has way too many samples --> simplify before plotting
-```{r}
-mini_df <- df %>%
-  filter(grepl('^EGFP', sample_name) | grepl('^RRP40', sample_name)) %>%
-  mutate(sample_name = sub('_hg38.*', '', sample_name))
-```
 
 ```{r}
-mini_df %>%
-  group_by(sample_name, rel_pos) %>%
-  summarize(mean_log2_value = mean(log2(value+1))) %>%
-  ggplot(., aes(x=rel_pos, y=mean_log2_value, color=sample_name)) +
+ggplot(agg, aes(x=rel_pos, y=mean, color=sample)) +
   geom_line() +
+  geom_ribbon(aes(x=rel_pos, ymin=conf.low, ymax=conf.high, fill=sample), alpha=.2, color=NA) +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ```
 
+you can see this is pretty messy. But can easily be modified using base R or tidyverse functionality.
 
-
-##more funky metagene profile with confidence interval
-needs a little extra package for tidy t-testing (should be loaded but just to make sure)
-
-```{r}
-library('broom')
-```
-
+For example we are only interested in ctrl, Z1 vs Z8 but the replicates should be distinguished more readily
 
 ```{r}
-(meta_values <- mini_df %>%
-  group_by(sample_name, rel_pos) %>%
-  do(tidy(t.test(log2(.$value+1)))))
-```
-
-```{r}
-meta_values %>%
-  ggplot(.) +
-  geom_line(aes(x=rel_pos, y=estimate, color=sample_name)) +
-  geom_ribbon(aes(x=rel_pos, ymin=conf.low, ymax=conf.high, fill=sample_name, stroke=NA), alpha=.2) +
+agg %>%
+  dplyr::filter(grepl('^ZCCHC8', sample) | grepl('^ZFC3H1', sample) | grepl('^EGFP', sample)) %>%
+  tidyr::separate(sample, c('siRNA', 'rep'), sep='_') %>%
+ggplot(., aes(x=rel_pos, y=mean, color=siRNA, linetype=rep)) +
+  geom_line() +
+  theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 ```
+--> much easier to appreciate that both Z8 and Z1 have higher signal close to 0.
 
 
 #### a heatmap
 
+heatmap display in R is somewhat "heavy". In most cases its probably best to use deeptools plotHeatmap, perhaps modify the input matrix before using computeMatrixOperations from deeptools or the script computeMatrixOperationsMS.py from Manfreds Software folder.
+
+In any case, if you rather use R, you will first need to convert m into a tidy object. RMetatools has a built-in function for this.
+
 ```{r}
-mini_df %>%
-  ggplot(., aes(x=rel_pos, y=id, fill=log2(value+1))) +
+m_tidy <- to_tibble(m)
+
+m_tidy
+```
+
+There is small issue that rel_pos is not considered to be numeric, need to be fixed for most use-cases below.
+
+```{r}
+m_tidy %<>%
+  mutate(rel_pos = as.numeric(rel_pos))
+```
+
+Also: a pretty slowing-down feature is actually the y axis labels, usually best to simply suppress those with theme(axis.text.y = element_blank())
+
+Basic heatmap can be created like this:
+```{r}
+m_tidy %>%
+  ggplot(., aes(x=rel_pos, y=name, fill=log2(value+1))) +
   geom_tile() +
-  facet_grid(.~sample_name) +
-  theme(axis.text.y = element_blank()) +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
+  facet_grid(.~sample) +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_text(angle=45, hjust=1))
+```
+This is pretty useless as there is way too much information. Preferably take as above only ctrl, Z8 and Z1 and use the average of the values like that. 
+
+First subset the tidy object and compute the average, not the NA values that may exist (depending on whether you chose to convert NA to 0 earlier or not).
+```{r}
+m_tidy_simple <- m_tidy %>%
+  dplyr::filter(grepl('^ZCCHC8', sample) | grepl('^ZFC3H1', sample) | grepl('^EGFP', sample)) %>%
+  mutate(value = ifelse(is.na(value), 0, value)) %>%
+  tidyr::separate(sample, c('siRNA', 'rep'), sep='_') %>%
+  group_by(name, siRNA, rel_pos) %>%
+  summarize(mean_log2_value = mean(log2(value+1)))
+```
+
+create the much more comprehensive heatmap
+```{r}
+m_tidy_simple %>%
+  ggplot(., aes(x=rel_pos, y=name, fill=mean_log2_value)) +
+  geom_tile() +
+  facet_grid(.~siRNA) +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_text(angle=45, hjust=1))
 ```
 
 #### a heatmap sorted by signal
 
+It can happen that heatmaps actually contain very little data, ie heavily inflated by 0 values. To get nicer plots, remove 'all-0' rows and sort by signal.
+
 ```{r}
-ids_sum_sorted <- mini_df %>%
-  group_by(id) %>%
-  summarize(total_value = sum(value)) %>%
+ids_sum_sorted <- m_tidy_simple %>%
+  group_by(name) %>%
+  summarize(total_value = sum(mean_log2_value)) %>%
+  dplyr::filter(total_value > 0) %>%
   arrange(total_value) %$%
-  id
+  name
 ```
 
 ```{r}
-mini_df %>%
-  mutate(id = factor(id, levels=ids_sum_sorted)) %>%
-  ggplot(., aes(x=rel_pos, y=id, fill=log2(value+1))) +
+m_tidy_simple %>%
+  dplyr::filter(name %in% ids_sum_sorted) %>%
+  mutate(name = factor(name, levels=ids_sum_sorted)) %>%
+  ggplot(., aes(x=rel_pos, y=name, fill=mean_log2_value)) +
   geom_tile() +
-  facet_grid(.~sample_name) +
-  theme(axis.text.y = element_blank()) +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
+  facet_grid(.~siRNA) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_text(angle=45, hjust=1))
+```
+slightly better but the color scheme also not helping much. This can still be improved a bit more
+
+```{r}
+m_tidy_simple %>%
+  dplyr::filter(name %in% ids_sum_sorted) %>%
+  mutate(name = factor(name, levels=ids_sum_sorted)) %>%
+  ggplot(., aes(x=rel_pos, y=name, fill=mean_log2_value)) +
+  geom_tile() +
+  scale_fill_gradient(low='white', high='firebrick4') +
+  facet_grid(.~siRNA) +
+  theme_minimal() +
+  theme(axis.text.y = element_blank(),
+        axis.text.x = element_text(angle=45, hjust=1))
 ```
 
 
 
 # Metagene Analysis Directly with RMetaTools
 
+You can also totally avoid using deeptools. But this was a hobby project hardly ever used in practice, even though it works. ie The part of the vignette below was mostly created for my own record.
 
 #### Load metagene values
 
@@ -205,7 +298,39 @@ Track files, this are usually 2 bigwig files for stranded data. If you are assay
 ```{r}
 bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
 bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
+```
 
+
+
+
+#### Compute matrices and create metagene object directly in R
+
+this can take some time and make downstream processing slow
+```{r}
+mR <- metagene_rel_anchor(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
+
+names(mR)
+mR$header
+mR$groups
+mR$samples
+```
+
+
+```{r}
+mRo <- modify(mR, select_samples =c('mNET'), rename_samples = '.*\\/')
+mRo$samples
+```
+```{r}
+mRo <- modify(mRo, rename_samples = 'GSM......._')
+mRo <- modify(mRo, rename_samples = '__.*')
+mRo$samples
+```
+
+
+#### R create metagene values directly to tibble
+
+this can take some time and make downstream processing slow
+```{r}
 meta_tbl <- RMetaTools::metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
 
 meta_tbl
@@ -711,6 +836,43 @@ Conversion to tidy format is also implemented as function. This should return ex
 
 
 
+# DEPRECATED
+
+#### for deeptools v2
+
+probably never used anymore
+```{r}
+fname <- system.file("extdata", "matrix.gz", package = "RMetaTools")
+df <- load_deeptoolsmatrix(fname)
+
+df
+```
+
+#### older version for deeptools v3
+```{r}
+fname <- system.file("extdata", "deeptools3_matrix.gz", package = "RMetaTools")
+
+df <- load_deeptoolsmatrix3(fname)
+```
+
+
+#### simple metagene plot therefrom
+
+ups: this example has way too many samples --> simplify before plotting
+```{r}
+mini_df <- df %>%
+  filter(grepl('^EGFP', sample_name) | grepl('^RRP40', sample_name)) %>%
+  mutate(sample_name = sub('_hg38.*', '', sample_name))
+```
+
+```{r}
+mini_df %>%
+  group_by(sample_name, rel_pos) %>%
+  summarize(mean_log2_value = mean(log2(value+1))) %>%
+  ggplot(., aes(x=rel_pos, y=mean_log2_value, color=sample_name)) +
+  geom_line() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
 # Session
 
 ```{r}

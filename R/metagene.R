@@ -1,413 +1,391 @@
-#' Metagene Regions
+
+#' Coerce metagene object to tibble
 #'
-#' Creates regions for metagene analysis.
+#' Collects info from metagene object into a single tibble.
 #'
-#' @param bed filename for bed file.
-#' @param anchor anchor point TSS, TES, center or NULL (default='TSS')
-#' @param upstream bp upstream of anchor (default=1000)
-#' @param downstream bp downstream of anchor (default=1000)
+#' @param m a metagene object
+#' @param ... other arguments, currently ignored
 #'
-#' @details Loads the bed file. If anchor is NULL, returns region from TSS-upstream to TES+downstream. If anchor, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream of the anchor point.
+#' @details
 #'
-#' @return GRanges with regions.
+#' @return
+#' a tibble with columns, rel_pos, value, sample, group, and name, where name is the id column of the metagene object regions, usually col4 of the bed file used to create the object.
 #'
 #' @examples
-#'
-#' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-#'
+#'  fname <- system.file("extdata", "matrix_grouped.gz", package = "RMetaTools")
+#'  m <- load_deeptoolsmatrix3_new(fname)
+#'  to_tibble(m)
 #' @export
-meta_regions <- function(bed,
-                        anchor = 'TSS',
-                        upstream = 1000,
-                        downstream = 1000) {
-
-  if( class(bed) == 'GRanges' ) {
-     anno <- bed
-  } else if ( class(bed) == 'character' ) {
-    tryCatch(
-      anno <- rtracklayer::import(bed),
-      error = function(c) {
-        c$message <- paste0("Error while trying to create metagene regions from bed file: ", anno, '\n', c$message)
-        stop(c)
-      }
-    )
-  } else {
-    stop(paste0('failed to interpret regions', anno))
-  }
-
-  anno$original_start <- start(anno)
-  anno$original_end <- end(anno)
-  if( !('name' %in% colnames(mcols(anno))) ) {
-    anno$name <- paste0('region', seq(length(anno)))
-  }
-
-  strands <- as.vector(strand(anno))
-
-  if(is.null(anchor)){
-    start(anno) <- ifelse(strand(anno) == '+', start(anno) - upstream, start(anno) - downstream)
-    end(anno) <- ifelse(strand(anno) == '+', end(anno) + downstream - 1, end(anno) + upstream - 1) #0 counts as first position
-  }else{
-    anchor_position <- case_when(
-      (anchor == 'TSS' & strands == '-') ~ end(anno),
-      anchor == 'TSS' ~ start(anno),
-      anchor == 'TES' & strands == '-' ~ start(anno),
-      anchor == 'TES' ~ end(anno),
-      anchor == 'center' ~ as.integer(start(anno) + (end(anno)-start(anno))/2)
-    )
-    start(anno) <- ifelse(strand(anno) == '+', anchor_position - upstream, anchor_position - downstream)
-    end(anno) <- ifelse(strand(anno) == '+', anchor_position + downstream - 1, anchor_position + upstream - 1) #0 counts as first position
-  }
-
-  return(anno)
+to_tibble <- function(m, ...){
+  lapply(seq_along(m$matrices), function(i) {
+    as_tibble(m$matrices[[i]]) %>%
+      set_colnames(m$rel_pos) %>%
+      gather(rel_pos, value) %>%
+      mutate(sample = m$samples[[i]],
+             group = m$groups[[i]],
+             name = rep(m$regions[[m$groups[[i]]]]$id,
+                        length(m$rel_pos))
+      )
+  }) %>%
+    bind_rows %>%
+    dplyr::select(sample, group, name, rel_pos, value)
 }
 
 
 
-#' Single Strand Metagene Matrix
+
+
+#' Select and rename metagene object sample or group names
 #'
-#' Creates metagene matrix for single bigwig file.
+#' Select and/or rename sample and/or group names
 #'
-#' @param bw filename for bigwig file.
-#' @param anno GRanges object of regions to query.
-#' @param upstream bp upstream of anchor (default=1000)
-#' @param downstream bp downstream of anchor (default=1000)
+#' @param m a metagene object
+#' @param select_samples regex or list of regex(es) for samples to select
+#' @param remove_samples regex or list of regex(es) for samples to remove
+#' @param select_groups regex or list of regex(es) for groups to remove
+#' @param remove_groups regex or list of regex(es) for groups to remove
+#' @param rename_samples a regexes and substitute string, default is substitute is empty
+#' @param rename_groups a regexes and substitute string, default is substitute is empty
+#' @param verbose report changes to stdout
 #'
-#' @details Loads the bed file, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. I upstream and downstream are both NULL, collects signal within region specified in anno.
+#' @details
 #'
-#' @return matrix with columns from most upstream to most downstream and rows are the individual regions from specified strand. rownames are set as name column from anno. colnames are set to relative position of each nt
+#' @return
+#' a tibble with columns, rel_pos, value, sample, group, and name, where name is the id column of the metagene object regions, usually col4 of the bed file used to create the object.
 #'
 #' @examples
-#'
-#' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-#' bw <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-#' mat <- get_single_strand_matrix(bw=bw, anno=regions, upstream=1000, downstream=5000)
+#'  fname <- system.file("extdata", "matrix_grouped.gz", package = "RMetaTools")
+#'  m <- load_deeptoolsmatrix3_new(fname)
 #'
 #' @export
-get_single_strand_matrix <- function(bw, anno, upstream=1000, downstream=1000) {
-
-  ##handling specific strand and order to ensure correct output naming
-  seqlevels(anno) <- sort(seqlevels(anno))
-  anno <- sort(anno)
-
-  ##handling uneven region sizes without defined window size
-  if(is.null(upstream) & is.null(downstream)) {
-    message('using scale region mode, upstream and downstream arguments are ignored')
-    upstream <- 0
-    downstream <- max(width(anno))
+modify.metagene <- function(m,
+                            select_samples = NULL,
+                            remove_samples = NULL,
+                            select_groups = NULL,
+                            remove_groups = NULL,
+                            rename_samples = NULL,
+                            rename_groups = NULL,
+                            verbose = FALSE){
+  sel <- rep(TRUE, length(m$matrices))
+  if (!missing(select_samples)) {
+    sel <- sel & grepl(paste(select_samples, collapse='|'), m$samples)
   }
 
-  ##ensure to query only chrs present in bigwig,
-  ## ie otherwise import(bw, ...) will return in error
-  bw_chrs <- seqlevels(BigWigFile(bw))
-  contained_anno_rows <- which(as.character(seqnames(anno)) %in% bw_chrs)
-  if (length(contained_anno_rows) != length(anno)) {
-    warning(paste0('ignoring chromosomes from annotation file not present in the bigwig file for strand: ', strand,
-                   ': ', paste0(seqlevels(anno[-contained_anno_rows]))))
-  }
-  mat <- matrix(NA, nrow = length(anno), ncol = upstream+downstream)
-  matc <- as.matrix(rtracklayer::import(bw,
-                                       which=anno[contained_anno_rows],
-                                       as='NumericList'))
-  mat[contained_anno_rows,] <- matc
-  rownames(mat) <- paste(seqnames(anno),
-                         anno$original_start,
-                         anno$original_end,
-                         anno$name,
-                         strand(anno),
-                         sep = '\t')
-  colnames(mat) <- seq(-upstream, downstream-1)
-
-  mat
-}
-
-
-
-#' Collapse Matrix To Windows by Window Size
-#'
-#' Averages Matrix Columns into Windows using an Averaging Function amd a defined window size
-#'
-#' @param mat matrix
-#' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
-#' @param window_size size for binning in bp (default=10, ie average over 10nt)
-#'
-#' @details for a matrix with ncol=100 and window_size=10, will return a matrix with ncol=10. collapse_fun is a function that functions as ie rowMeans (the default) or rowSums.
-#'
-#' @return matrix with ncol(input matrix)/window_size columns
-#'
-#' @examples
-#'
-#' mat <- matrix(1:1000, nrow=10, ncol=100)
-#' matc <- collapse_to_n_windows(anno, mat, mean, 10)
-#' dim(matc)
-#'
-#' log2RowMeans <- function(mat, pseudocount=1){apply(mat,1,function(row) mean(log2(row+pseudocount)))}
-#' matc <- collapse_to_window_size(mat, log2RowMeans, 10)
-#' dim(matc)
-#'
-#' @export
-collapse_to_window_size <- function(mat, collapse_fun = rowMeans, window_size = 10) {
-  if (window_size > 1) {
-    size <- ncol(mat)
-    wins <- seq(1,size, window_size)
-
-    matc <- lapply(wins, function(i) collapse_fun(mat[,i:(i+window_size-1)])) %>%
-      bind_cols %>%
-      as.matrix
-
-    colnames(matc) <- sapply(wins, function(i) colnames(mat)[i])
-    rownames(matc) <- rownames(mat)
-
-    mat <- matc
+  if (!missing(remove_samples)) {
+    sel <- sel & !grepl(paste(remove_samples, collapse='|'), m$samples)
   }
 
-  mat
-}
-
-
-#' Collapse Matrix To Windows by Window Number
-#'
-#' Averages Matrix Columns into Windows using an Averaging Function amd a defined number of windows
-#'
-#' @param mat matrix
-#' @param collapse_fun function for averaging values inside windows (Default = rowMeans, see Details).
-#' @param n_windows number of windows (default=10, ie collapse to 10 values eah)
-#'
-#' @details for a matrix with ncol=100 or 50 and n_windows=10, will return a matrix with ncol=10 in both cases. collapse_fun is a function that functions as ie rowMeans (the default) or rowSums.
-#'
-#' @return matrix with n_windows columns
-#'
-#' @examples
-#'
-#' bedfile <- system.file("extdata", "snRNA_MS31_hg38.bed", package = "RMetaTools")
-#' regions <- rtracklayer::import(bedfile)
-#' mat <- get_single_strand_matrix(bw=bw, anno=regions, upstream=NULL, downstream=NULL)
-#' dim(mat)
-#' matc <- collapse_to_n_windows(anno, mat, mean, 10)
-#' dim(matc)
-#'
-#' @export
-collapse_to_n_windows <- function(anno, mat, collapse_fun = mean, n_windows = 10) {
-
-  matc <- t(sapply(seq_along(anno), function(i) {
-      windows <- as.integer(seq(1,ncol(mat)+1,length.out = n_windows+1))
-
-      window_starts <- windows[1:length(windows)-1]
-      window_ends <- windows[2:length(windows)]-1
-      wins <- data.frame(s=window_starts, e=window_ends)
-
-      apply(wins, 1, function(win) collapse_fun(mat[i,win['s']:win['e']]))
-    }))
-
-  colnames(matc) <- 1:n_windows
-  rownames(matc) <- rownames(mat)
-
-  matc
-}
-
-
-
-#' Metagene Matrix
-#'
-#' Creates metagene matrix for both strands using 1 or 2 bigwig files.
-#'
-#' @param bw_plus filename for plus strand bigwig file.
-#' @param bw_minus filename for minus strand bigwig file.
-#' @param anno GRanges object of regions to query.
-#' @param upstream bp upstream of anchor (default=1000)
-#' @param downstream bp downstream of anchor (default=1000)
-#' @param collapse_to_win_size size for binning in bp (default=1, ie no binning)
-#' @param collapse_to_n_wins number of bins to collapse to (default=NULL, ie no binning)
-#' @param collapse_avg_fun function for averaging values inside windows (Default = rowMeans, see Details).
-#' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
-#' @details Loads the bed file. Anchored mode requires a anchor, upstream and downstream, extracts the position of the anchor point and
-#'   creates ranges from x bp upstream to x bp downstream. I anchor, upstream and downstream are NULL, collects values over specified entire regions.
-#'   If collapse_to_win_size is set to a integer > 0, uses collapse_avg_fun (rowMeans, rowSums or similar) to overage signals within this range See \code{\link{collapse_to_window_size}} for more info about averaging over window size.
-#'   If collapse_to_n_wins is not NULL, ups: this requires collapse_avg_fun to be set to mean, sum or similar (ie instead of the default rowMeans) to overage signals into x equally sized bins. Only used if collapse_to_win_size is not > 1. See \code{\link{collapse_to_n_windows}} for more info about averaging into defined number of windows.
-#'   Negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all
-#'   negative values as used by some labs.
-#'
-#' @return matrix with columns from most upstream to most downstream and rows are the individual regions. Rownames are the Name column from the bed file.
-#'
-#' @examples
-#'
-#' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-#' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-#' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-#' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 1)
-#' dim(mat)
-#' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 50)
-#' dim(mat)
-#' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, collapse_to_n_wins=5, collapse_avg_fun=mean)
-#' dim(mat)
-#'
-#' #if bigwigs are not stranded, ie from ChIP experiment both plus and minus are the same file
-#' bw <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_hg38.bw", package = "RMetaTools")
-#' mat <- get_matrix(bw, bw, regions, 1000, 5000, 50)
-#'
-#'
-#' @export
-get_matrix <- function(bw_plus, bw_minus, anno,
-                       upstream=1000, downstream=1000,
-                       collapse_to_win_size = NULL,
-                       collapse_to_n_wins = NULL,
-                       collapse_avg_fun = rowMeans,
-                       negate_neg_strand_values=FALSE) {
-  smat <- get_single_strand_matrix(bw_plus, anno[strand(anno)=="+"], upstream, downstream)
-  asmat <- get_single_strand_matrix(bw_minus, anno[strand(anno)=="-"], upstream, downstream)
-  asmat <- asmat[,ncol(asmat):1]
-  if (negate_neg_strand_values) {
-    asmat <- -asmat
-  }
-  if(ncol(smat) > ncol(asmat)){
-    asmat <- cbind(asmat, matrix(NA, nrow=nrow(asmat), ncol=(ncol(smat)-ncol(asmat)) ))
-  }else if(ncol(smat) < ncol(asmat)){
-    smat <- cbind(smat, matrix(NA, nrow=nrow(smat), ncol=(ncol(asmat)-ncol(smat)) ))
-  }
-  mat <- rbind(smat, asmat)
-  if(!is.null(collapse_to_win_size)) {
-    mat <- collapse_to_window_size(mat, collapse_avg_fun, collapse_to_win_size)
-  }else if(!is.null(collapse_to_n_wins)){
-    mat <- collapse_to_n_windows(anno, mat, collapse_avg_fun, collapse_to_n_wins)
-  }
-  mat
-}
-
-
-
-#' Tidy Metagene Matrix
-#'
-#' Converts metagene matrix into a tidy tbl.
-#'
-#' @param mat metagene matrix created from get_matrix
-#'
-#' @details Converts metagene matrix to tbl using rownames and colnames information to assign a column *name* and *rel_pos* respectively.
-#'
-#' @return matrix with columns from most upstream to most downstream and rows are the individual regions.
-#'
-#' @examples
-#'
-#' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-#' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-#' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-#' mat <- get_matrix(bw_plus, bw_minus, regions, 1000, 5000, 50)
-#' tidy_meta <- mat_to_tbl(mat)
-#'
-#' @export
-mat_to_tbl <- function(mat) {
-
-  nm <- mat %>%
-    as.data.frame %>%
-    tibble::rownames_to_column(var = 'name') %>%
-    tidyr::gather(., rel_pos, value, -name) %>%
-    mutate(rel_pos = as.numeric(rel_pos)) %>%
-    tbl_df
-
-  nm
-}
-
-
-
-#' Metagene Matrix
-#'
-#' Computes a metagene matrix from scratch.
-#'
-#' @param bw_plus bigwig filename for plus strand signal
-#' @param bw_minus bigwig filename for minus strand signal
-#' @param anno Bed filename for annotations to use OR a GRanges object (see Details).
-#' @param anchor 'TSS', 'TES', 'center' or NULL (default='TSS')
-#' @param upstream bp upstream of anchor (default=1000)
-#' @param downstream bp downstream of anchor (default=1000)
-#' @param collapse_to_win_size size for binning in bp (default=1, ie no binning)
-#' @param collapse_to_n_wins number of bins to collapse to (default=NULL, ie no binning)
-#' @param collapse_avg_fun function for averaging values inside windows (Default = rowMeans, see Details).
-#' @param negate_neg_strand_values negate values from minus strand bigwig (default=FALSE).
-#'
-#' @details Loads the bed file. If anchor is given, extracts the position of the anchor point and creates ranges from x bp upstream to x bp downstream. If anchor is NULL, collects signal in specified region from TSS-upstream to TES+downstream. Queries from both bigwigs and the correct strand. Summarizes signal of window_size bins and returns a tidy data.frame. negate_neg_strand_values can be set to TRUE to deal with minus strand bigwigs which contain all negative values as used by some labs.
-#' When using a GRanges object for anno, this assumes the bigwigs will be queries from start to end! All ranges must be exactly same size!
-#'
-#' @return Tidy data frame with columns: gene (name, ie col4 from *bed* file), rel_pos (position in bp relative to *anchor*), value (averaged value from bigwig file).
-#'
-#' @examples
-#'
-#' bedfile <- system.file("extdata", "Chen_PROMPT_TSSs_liftedTohg38.bed", package = "RMetaTools")
-#' bw_plus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_plus_hg38.bw", package = "RMetaTools")
-#' bw_minus <- system.file("extdata", "GSM1573841_mNET_8WG16_siLuc_minus_hg38.bw", package = "RMetaTools")
-#' anno=bedfile;anchor='center';upstream=1000;downstream=1000;window_size=10
-#' collapse_fun = rowMeans;negate_neg_strand_values=FALSE
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, collapse_to_n_wins=5, collapse_avg_fun=mean)
-#' bedfile <- system.file("extdata", "snRNA_MS31_hg38.bed", package = "RMetaTools")
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor, upstream, downstream, window_size)
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor=NULL, 10, 10, collapse_to_n_wins=5, collapse_avg_fun=mean)
-#'
-#' # for pre-loaded regions (useful for ie modifying regions by hand)
-#' # this most useful
-#' regions <- meta_regions(bedfile, 'TSS', 1000, 5000)
-#' start(regions) <- start(regions) + 1000
-#' end(regions) <- end(regions) - 1000
-#' regions <- regions[width(regions)>0,]
-#' metamat <- metagene_matrix(bw_plus, bw_minus, regions, anchor=NULL, upstream=0, downstream=0, collapse_to_n_wins=5, collapse_avg_fun=mean)
-#' metamat <- metagene_matrix(bw_plus, bw_minus, regions, anchor='TSS', upstream=100, downstream=100, collapse_to_win_size=50, collapse_avg_fun=rowMeans)
-#' metamat <- metagene_matrix(bw_plus, bw_minus, bedfile, anchor='TSS', upstream=100, downstream=100, collapse_to_win_size=50, collapse_avg_fun=rowMeans)
-#'
-#' @export
-metagene_matrix <- function(bw_plus, bw_minus, anno,
-                            anchor='TSS', upstream=1000, downstream=1000,
-                            collapse_to_win_size = NULL,
-                            collapse_to_n_wins = NULL,
-                            collapse_avg_fun = rowMeans,
-                            negate_neg_strand_values=FALSE) {
-
-  meta_args <- c(anchor, upstream, downstream)
-  names(meta_args) <- c('anchor', 'upstream', 'downstream')
-
-  if (!is.null(collapse_to_win_size)) {meta_args['collapse_to_win_size'] = collapse_to_win_size}
-  if (!is.null(collapse_to_n_wins)) {meta_args['collapse_to_n_wins'] = collapse_to_n_wins}
-
-
-  tryCatch(
-      regions <- meta_regions(anno, anchor, upstream, downstream),
-      error = function(c) {
-        c$message <- paste0("Error while trying to create metagene regions \n", c$message)
-        stop(c)
-      })
-
-  if(is.null(anchor)){
-    upstream <- NULL
-    downstream <- NULL
+  if (!missing(select_groups)) {
+    sel <- sel & grepl(paste(select_groups, collapse='|'), m$groups)
   }
 
-  tryCatch(
-    mat <- get_matrix(bw_plus, bw_minus, regions,
-                      upstream, downstream,
-                      collapse_to_win_size, collapse_to_n_wins,
-                      collapse_avg_fun, negate_neg_strand_values),
-    error = function(c) {
-      c$message <- paste0("Error while trying to create  metagene matrix.\n", c$message)
-      stop(c)
-    }
-  )
+  if (!missing(remove_groups)) {
+    sel <- sel & !grepl(paste(remove_groups, collapse='|'), m$groups)
+  }
 
-  tryCatch(
+  if(verbose){
+    print(paste0('selecting ', sum(sel), ' of ', length(sel), ' matrices.'))
+  }
+
+  out <- m
+  out$matrices <- out$matrices[sel]
+  out$samples <- out$samples[sel]
+  out$groups <- out$groups[sel]
+  out$rel_pos <- out$rel_pos[sel]
+  out$regions <- out$regions[out$groups]
+  out$header <- lapply(out$header, function(h)
     {
-      mat <- mat_to_tbl(mat)
-    },
-    error = function(c) {
-      c$message <- paste0("Error while converting raw metagene matrix to tbl.\n", c$message)
-      stop(c)
-    }
-  )
+      if(length(h) == length(sel)){
+        h <- h[sel]
+      }
+    h
+    })
 
-  for(i in seq_along(meta_args)){
-    attr(mat, names(meta_args)[i]) <- meta_args[i]
+  sel_idx <- which(sel)
+  sample_sizes <- as.numeric(out$header$sample_boundaries[sel_idx+1])-as.numeric(out$header$sample_boundaries[sel_idx])
+  out$header$sample_boundaries <- c(0, cumsum(sample_sizes))
+
+  group_sizes <- as.numeric(out$header$group_boundaries[sel_idx+1])-as.numeric(out$header$group_boundaries[sel_idx])
+  out$header$group_boundaries <- c(0, cumsum(group_sizes))
+
+  if (!missing(rename_samples)) {
+    if(verbose){
+      print(paste0('sample names: ', paste(unique(out$samples))))
+    }
+
+    if(length(rename_samples) == 1){
+      rename_samples <- c(rename_samples, '')
+    }
+
+    out$samples %<>% sub(rename_samples[1], rename_samples[2], .)
+
+    if(verbose){
+      print(paste0(' changed to: ', paste(unique(out$samples))))
+    }
   }
 
-  mat
+  if (!missing(rename_groups)) {
+    if(verbose){
+      print(paste0('group names: ', paste(unique(out$groups))))
+    }
+
+    if(length(rename_groups) == 1){
+      rename_groups <- c(rename_groups, '')
+    }
+
+    out$groups %<>% sub(rename_samples[1], rename_samples[2], .)
+    names(out$rel_pos) %<>% sub(rename_samples[1], rename_samples[2], .)
+    names(out$regions) %<>% sub(rename_samples[1], rename_samples[2], .)
+
+    if(verbose){
+      print(paste0(' changed to: ', paste(unique(out$groups))))
+    }
+  }
+
+  out
+
 }
+
+
+
+#' Metagene Aggregate
+#'
+#' Metagene aggregate from an S3 metagene object.
+#'
+#' @param m the object to create the metagene aggregate for
+#' @param aggregate_fun the function name to aggregate values such as 'events', 'sum', 'mean', 'ttest' (default is 'mean')
+#' @param transform_fun a function to be applied to vlues before aggregate function is applied.
+#' @param ... other arguments passed to fun
+#'
+#' @details Aggregates values.
+#' transform_fun takes a matrix as input and returns a similar sized matrix. ie log2p1 <- function(m){log2(m+1)}
+#' aggreagate_fun can be mean, sum, events or t.test or vector containing several of those.
+#'
+#' @return
+#' a tibble with column, rel_pos, sample, group, and aggregate values where column name is mean, sum, events or estimate+conf.low+conf.high for ttest
+#' @examples
+#'  fname <- system.file("extdata", "matrix_grouped.gz", package = "RMetaTools")
+#'  m <- load_deeptoolsmatrix3_new(fname)
+#'  metagene_aggregate(m)
+#'  metagene_aggregate(m, aggregate_fun = 'events')
+#'  metagene_aggregate(m, aggregate_fun = 'ttest')
+#'  log2p1 <- function(m){log2(m+1)}
+#'  metagene_aggregate(m, aggregate_fun = 'mean', transform_fun = log2p1)
+#'
+#' @export
+metagene_aggregate <- function(m, aggregate_fun = 'mean', transform_fun = NULL, ... ) {
+
+  if (missing(transform_fun)) {
+    mat_list <- m$matrices
+  }else{
+    mat_list <- lapply(m$matrices, transform_fun)
+  }
+
+  if( 'mean' %in% aggregate_fun ){
+    agg_fun <- function(m){data.frame(mean = colMeans(m))}
+  }else if( 'sum' %in% aggregate_fun ){
+    agg_fun <- function(m){data.frame(mean = colSums(m))}
+  }else if( 'events' %in% aggregate_fun ){
+    agg_fun <- function(m){
+      data.frame(events = apply(m,2,function(mi)sum(mi > 0)))
+    }
+  }else if( aggregate_fun == 'ttest' ){
+    agg_fun <- function(m){
+      meta_ttests <- apply(m, 2, function(mi) t.test(mi))
+      tibble(
+        mean =  lapply(meta_ttests, function(tti) tti$estimate) %>% simplify,
+        conf.low =  lapply(meta_ttests, function(tti) tti$conf.int[1]) %>% simplify,
+        conf.high = lapply(meta_ttests, function(tti) tti$conf.int[2]) %>% simplify
+      )
+    }
+  }
+
+  lapply(seq_along(mat_list), function(i) {
+    tibble(
+      rel_pos = m$rel_pos,
+      sample = m$samples[[i]],
+      group = m$groups[[i]]) %>%
+      bind_cols(., agg_fun(mat_list[[i]]))
+  }) %>%
+    bind_rows
+}
+
+
+#' Metagene Ratio
+#'
+#' Computes Ratios between matrices to one control
+#'
+#' @param m the object to create the metagene aggregate for
+#' @param samples sample names for one or more matrices from m to be used
+#' @param control sample name for one of the matrices from m to be used as denominator
+#' @param transform_fun a function to be applied to vlues before aggregate function is applied.
+#' @param ... other arguments passed to fun
+#'
+#' @details Ratio of values.
+#' transform_fun takes a matrix as input and returns a similar sized matrix. ie p1 <- function(m){m+1}
+#' Computes the ratio to the control matrix.
+#' Handles all groups if there is more than one group present.
+#'
+#' @return
+#' a metagene object
+#'
+#' @examples
+#'  fname <- system.file("extdata", "matrix_grouped.gz", package = "RMetaTools")
+#'  m <- load_deeptoolsmatrix3_new(fname)
+#'  p1 <- function(m){return(m+1)}
+#'  ratios <- metagene_ratio(m, c('RRP40', 'ZCCHC8', 'ZFC3H1'), 'MTR4', transform_fun=p1)
+#' @export
+metagene_ratio <- function(m, samples, control, transform_fun = NULL, ... ) {
+  ctrl_idx <- which(m$samples == control)
+  samples_idx <- which(m$samples %in% samples)
+
+  ctrl_mats  <- m$matrices[ctrl_idx]
+  ctrl_groups <- m$groups[ctrl_idx]
+  samples_mat <- m$matrices[samples_idx]
+  samples_groups <- m$groups[samples_idx]
+  sample_names <-
+
+  if (!missing(transform_fun)) {
+    ctrl_mats <- lapply(ctrl_mats, transform_fun)
+    samples_mat <- lapply(samples_mat, transform_fun)
+  }
+
+  ratios_mat <- lapply(seq_along(samples_mat), function(i) samples_mat[[i]]/ctrl_mats[[which(ctrl_groups == samples_groups[i])]])
+
+  names(ratios_mat) <- paste0(m$samples[samples_idx], '_rel_', control, '_', m$groups[samples_idx])
+
+  s3 <- structure(list(), class = "metagene")
+  s3$header <- m$header
+
+  s3$matrices <- ratios_mat
+
+  s3$samples <- paste0(m$samples[samples_idx], '_rel_', control)
+  s3$groups <- m$groups[samples_idx]
+
+  s3$rel_pos <- m$rel_pos
+
+  s3$regions <- m$regions
+
+  s3
+}
+
+# agg_fun <- function(mat){
+#   apply(mat, 2, function(mi) tidy(t.test(mi))) %>%
+#     bind_rows %>%
+#     dplyr::select(estimate, conf.low, conf.high) %>%
+#     dplyr::rename(mean=estimate)
+# }
+#   # tibble(
+#   #   mean =  lapply(meta_ttests, function(tti) tti$estimate) %>% simplify,
+#   #   conf.low =  lapply(meta_ttests, function(tti) tti$conf.int[1]) %>% simplify,
+#   #   conf.high = lapply(meta_ttests, function(tti) tti$conf.int[2]) %>% simplify
+#   # )
+# }
+
+
+#' plot_heatmap
+#'
+#' Plots tidy dataframe from a deeptools matrix file to a ggplot2 object.
+#'
+#' @param df the df to load.
+#' @param sort_y how to sort y axis of the heatmap ('region_len', 'sum', 'mean', 'max' )
+#' @param facets a string for facetting of the plot.
+#'
+#' @details Plots a df from a deeptools matrix tibble.
+#'
+#' @return An ggplot2 plot object.
+#'
+#' @examples
+#'
+#'  fname <- "/Users/schmidm/Documents/other_people_to_and_from/ClaudiaI/pA_seq/deeptools_out/Evgenia_PASseq_all_snRNA_joined.gz"
+#'  df <- load_deeptoolsmatrix(fname)
+#'  head(df)
+#'  plot_heatmap(df, sort_y='sum', facets='.~sample_name')
+#'
+#'  #can be further modified
+#'  p <- plot_heatmap(df, sort_y='sum', facets='.~sample_name')
+#'  p + ylab('')
+#'  p + scale_fill_gradient2(low='white', high='darkred')
+#'  p <- p + theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+#'  p + scale_fill_gradient2(low='white', high='darkred', name ='log10(norm. reads)')
+#'
+#' @export
+plot_heatmap <- function( df, sort_y='sum', facets=NULL ) {
+
+  if ( missing(sort_y) ) {
+    y_rank <- df %>% distinct(id) %>% mutate(sort_value = 1:nrow(.))
+  } else if (sort_y == 'sum') {
+    y_rank <- df %>% group_by(id) %>% summarize(sort_value = sum(value)) %>% select(id, sort_value)
+  } else if (sort_y == 'mean') {
+    y_rank <- df %>% group_by(id) %>% summarize(sort_value = mean(value)) %>% select(id, sort_value)
+  } else if (sort_y == 'max') {
+    y_rank <- df %>% group_by(id) %>% summarize(sort_value = max(value)) %>% select(id, sort_value)
+  } else if (sort_y == 'region_length') {
+    y_rank <- df %>% distinct(id, .keep_all=T) %>% mutate(sort_value = end-start)
+  }
+
+  y_rank %<>% mutate(yrank = rank(sort_value, ties.method='first'))
+
+  p <- left_join(df,y_rank)  %>%
+    ggplot(., aes(x=rel_pos, y=yrank, fill=log10(value))) +
+    geom_raster(interpolate=FALSE) +
+    theme_bw()
+
+  if (facets) {
+    p <- p +
+      facet_grid(facets)
+  }
+
+  p
+}
+
+
+
+#' Sort metagene object regions
+#'
+#' Sort metagene object regions as sum per line
+#'
+#' @param m metagene object
+#'
+#' @details Sorts the matrix and regions.
+#'
+#' @return The sorted metagene object
+#'
+#' @examples
+#'
+#'  matrix_name <- '/Users/schmidm/Documents/other_people_to_and_from/ClaudiaI/Effie_RNAseq_bws/RNAseq_deeptools_out/eRNA_tsspm5000_sorted_by_INT_binding_joined_sensitivity.gz'
+#'  bed_name <- '/Users/schmidm/Documents/other_people_to_and_from/ClaudiaI/Shiekkatar_INT_ChIP/eRNAs_sorted_by_INTS_binding.bed'
+#'
+#'  m_sorted <- sort_matrix(matrix_name, bed_name)
+#'
+#'  write.table(m_sorted, file='/Users/schmidm/Documents/other_people_to_and_from/ClaudiaI/Effie_RNAseq_bws/RNAseq_deeptools_out/eRNA_tsspm5000_sorted_by_INT_binding_joined_sensitivity_sorted', row.names = FALSE, col.names = FALSE, quote = F, dec = '.')
+#'
+#'
+#' @export
+sort_matrix <- function( m, bed_file ) {
+
+  groups <- unique(m$groups)
+  grp_order <- lapply(groups, function(group) {
+    lapply(m$matrices[m$groups == group], rowSums) %>%
+      bind_rows %>%
+      rowSums %>%
+      order
+  })
+
+  sorted <- m
+  sorted$matrices <- lapply(seq_along(m$matrices), function(i)
+    m$matrices[[i]][grp_order[[m$groups[[i]]]]])
+
+  sorted$regions <- lapply(seq_along(m$regions), function(i)
+    m$regions[[i]][grp_order[[i]]])
+
+  b <- read.table(bed_file)[,1:6]
+  colnames(b) <- c('chr', 'start', 'end', 'id', 'name', 'strand')
+  b %<>% as_tibble
+
+  semi_join(m, b)
+}
+
 
 
 

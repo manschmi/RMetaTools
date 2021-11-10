@@ -4,13 +4,16 @@
 \alias{load_deeptoolsmatrix3}
 \title{load_deeptoolsmatrix3}
 \usage{
-load_deeptoolsmatrix3(fname, na.omit = TRUE, na.fill = 0,
-  as.matrix = FALSE, as.S3 = FALSE)
+load_deeptoolsmatrix3(
+  fname,
+  na.omit = TRUE,
+  na.fill = 0,
+  as.matrix = FALSE,
+  as.S3 = FALSE
+)
 }
 \arguments{
 \item{fname}{the file to load.}
-
-\item{na.omit}{Skip na values in the matrix. Default is TRUE.}
 
 \item{na.fill}{Fills NAs with this value zero. Default is 0.}
 
@@ -40,11 +43,13 @@ Loads a gzipped deeptools matrix file and collects this in a
  fname <- system.file("extdata", "deeptools3_matrix.gz", package = "RMetaTools")
  df <- load_deeptoolsmatrix3(fname)
  head(df)
- df_withNA <- load_deeptoolsmatrix3(fname, na.omit=FALSE)
- head(df_withNA)
- df_withNAas0 <- load_deeptoolsmatrix3(fname, na.omit=FALSE, na.fill=0)
+ df_withNAas0 <- load_deeptoolsmatrix3(fname, na.fill=0)
  head(df_withNAas0)
- s3obj <- load_deeptoolsmatrix3(fname, na.omit=FALSE, na.fill=0, as.S3=TRUE)
+ s3obj <- load_deeptoolsmatrix3(fname, na.fill=0, as.S3=TRUE)
  head(s3obj$regions)
+ lapply(s3obj$matrices, head)
+ s3obj$samples
+ s3obj$groups
+ lapply(s3obj$rel_pos, head)
 
 }
