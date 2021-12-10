@@ -184,7 +184,7 @@ metagene_aggregate <- function(m, aggregate_fun = 'mean', transform_fun = NULL, 
   if( 'mean' %in% aggregate_fun ){
     agg_fun <- function(m){data.frame(mean = colMeans(m))}
   }else if( 'sum' %in% aggregate_fun ){
-    agg_fun <- function(m){data.frame(mean = colSums(m))}
+    agg_fun <- function(m){data.frame(sum = colSums(m))}
   }else if( 'events' %in% aggregate_fun ){
     agg_fun <- function(m){
       data.frame(events = apply(m,2,function(mi)sum(mi > 0)))
